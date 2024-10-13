@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/mangoAccountsWithDeposit.api.ts": {
+    "pages/api/mangoAccountsWithDeposit.api.ts": {
       "memory": 3009,
       "maxDuration": 60
     }
