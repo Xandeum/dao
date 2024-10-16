@@ -96,6 +96,7 @@
     "@solana/spl-governance": "0.3.28",
     "@solana/spl-stake-pool": "1.1.5",
     "@solana/spl-token": "0.1.8",
+    "@solana/spl-token-new": "npm:@solana/spl-token@0.4.8",
     "@solana/wallet-adapter-backpack": "0.1.13",
     "@solana/wallet-adapter-base": "0.9.22",
     "@solana/wallet-adapter-exodus": "0.1.17",
