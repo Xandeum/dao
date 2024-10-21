@@ -80,7 +80,7 @@ const transformFormData2RealmCreation = (formData: CommunityTokenForm) => {
       // COUNCIL INFO
       createCouncil: formData.addCouncil ?? false,
       communityTokenConfig: new GoverningTokenConfigAccountArgs({
-        tokenType: GoverningTokenType.Liquid,
+        tokenType: GoverningTokenType.Membership,
         voterWeightAddin: undefined,
         maxVoterWeightAddin: undefined,
       }),
