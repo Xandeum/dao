@@ -27,7 +27,7 @@ import { trySentryLog } from '@utils/logs'
 import { deduplicateObjsFilter } from '@utils/instructionTools'
 import { NftVoterClient } from '@utils/uiTypes/NftVoterClient'
 import { fetchProgramVersion } from '@hooks/queries/useProgramVersionQuery'
-import { chargeFee, PROPOSAL_FEE } from './createChargeFee'
+// import { chargeFee, PROPOSAL_FEE } from './createChargeFee'
 export interface InstructionDataWithHoldUpTime {
   data: InstructionData | null
   holdUpTime: number | undefined
@@ -142,7 +142,7 @@ export const createProposal = async (
     payer
   )
 
-  instructions.push(...chargeFee(wallet.publicKey!, PROPOSAL_FEE))
+  // instructions.push(...chargeFee(wallet.publicKey!, PROPOSAL_FEE))
 
   // TODO: Return signatoryRecordAddress from the SDK call
   const signatoryRecordAddress = await getSignatoryRecordAddress(
