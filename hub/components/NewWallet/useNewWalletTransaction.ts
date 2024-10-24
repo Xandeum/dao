@@ -59,10 +59,10 @@ const useNewWalletCallback = (
       rules,
     );
 
-    if (voterWeightPk) {
-      const instructions: TransactionInstruction[] = [];
-      const createNftTicketsIxs: TransactionInstruction[] = [];
-  
+    const instructions: TransactionInstruction[] = [];
+    const createNftTicketsIxs: TransactionInstruction[] = [];
+    
+    if (voterWeightPk) { 
       const { pre: preIx, post: postIx } = await updateVoterWeightRecords(
         wallet.publicKey,
         convertTypeToVoterWeightAction('createGovernance'),
@@ -70,6 +70,7 @@ const useNewWalletCallback = (
       instructions.push(...preIx);
       createNftTicketsIxs.push(...postIx);
     }
+    
     const governanceAddress = await withCreateGovernance(
       instructions,
       realm.owner,
@@ -80,7 +81,7 @@ const useNewWalletCallback = (
       tokenOwnerRecord.pubkey,
       wallet.publicKey,
       wallet.publicKey,
-      voterWeightPk,
+      voterWeightPk ?? undefined,
     );
     await withCreateNativeTreasury(
       instructions,
