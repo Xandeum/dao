@@ -207,24 +207,24 @@ const LockTokensModal = ({
     : 0
 
   const maxAmountToLock =
-    depositRecord && mint
+    depositRecord && mint && realmTokenAccount
       ? wantToLockMoreThenDeposited
         ? getMintDecimalAmount(
             mint,
             depositRecord?.amountDepositedNative.add(
-              new BN(realmTokenAccount!.account.amount)
+              new BN(realmTokenAccount.account.amount)
             )
           )
         : getMintDecimalAmount(mint, depositRecord?.amountDepositedNative)
       : 0
   const maxAmount = depositToUnlock ? maxAmountToUnlock : maxAmountToLock
   const maxAmountToLockFmt =
-    depositRecord && mint
+    depositRecord && mint && realmTokenAccount
       ? wantToLockMoreThenDeposited
         ? fmtMintAmount(
             mint,
             depositRecord?.amountDepositedNative.add(
-              new BN(realmTokenAccount!.account.amount)
+              new BN(realmTokenAccount.account.amount)
             )
           )
         : fmtMintAmount(mint, depositRecord?.amountDepositedNative)
