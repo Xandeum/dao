@@ -40,7 +40,6 @@ export class TokenVoterClient extends Client<TokenVoter> {
       const tokenVoterAddress = tokenVoterKey(realm, mint, voter, this.program.programId)[0]
       const tokenVoterAccount = await this.program.account.voter.fetch(tokenVoterAddress)
       const depositedTokens = tokenVoterAccount.deposits[0].amountDepositedNative
-      console.log("I have also been called")
       return depositedTokens
     } catch(e) {
       console.log(e)

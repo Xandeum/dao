@@ -71,7 +71,6 @@ export class BonkClient extends Client<BonkPlugin> {
     mint: PublicKey
   ): Promise<BN | null> {
     try {
-      console.log("I have been called")
       const bonkRegistrarAddress = bonkRegistrarKey(realm, mint, this.program.programId)
       const bonkRegistrar = await this.program.account.registrar.fetch(bonkRegistrarAddress)
 
@@ -152,7 +151,6 @@ export class BonkClient extends Client<BonkPlugin> {
   ) {
     const DEFAULT_TOKEN_VOTER_PROGRAMID = new PublicKey("HA99cuBQCCzZu1zuHN2qBxo2FBo1cxNLwKkdt6Prhy8v")
     const DEFAULT_SPL_STAKING_PROGRAMID = new PublicKey("STAKEkKzbdeKkqzKpLkNQD3SUuLgshDKCD7U8duxAbB")
-    console.log(programId.toBase58(), "Main kayah")
     return new BonkClient(
       new Program<BonkPlugin>(idl as BonkPlugin, programId, provider),
       new Program<TokenVoter>(tokenIdl as TokenVoter, DEFAULT_TOKEN_VOTER_PROGRAMID, provider),
