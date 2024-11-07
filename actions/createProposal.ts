@@ -28,6 +28,7 @@ import { deduplicateObjsFilter } from '@utils/instructionTools'
 import { NftVoterClient } from '@utils/uiTypes/NftVoterClient'
 import { fetchProgramVersion } from '@hooks/queries/useProgramVersionQuery'
 import { chargeFee, PROPOSAL_FEE } from './createChargeFee'
+import { bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes'
 
 export interface InstructionDataWithHoldUpTime {
   data: InstructionData | null
@@ -105,6 +106,15 @@ export const createProposal = async (
       )
     : VoteType.SINGLE_CHOICE
 
+  const proposalSeed = Keypair.generate().publicKey
+
+  const [proposalKey] = PublicKey.findProgramAddressSync([
+    Buffer.from('governance'),
+    governance.toBytes(),
+    governingTokenMint.toBytes(),
+    proposalSeed.toBytes()
+  ], realm.owner)
+
   //will run only if plugin is connected with realm
   const plugin = await client?.withUpdateVoterWeightRecord(
     instructions,
@@ -112,6 +122,18 @@ export const createProposal = async (
     createNftTicketsIxs,
     governance
   )
+
+  if (instructions.length && client?.voterWeightPluginDetails.plugins?.voterWeight[0].name === "bonk") {
+    instructions[0].data = 
+      Buffer.concat([
+       instructions[0].data.slice(0,9),
+       governance.toBuffer(),
+       instructions[0].data.slice(41)
+      ])
+
+    instructions[0].keys[5].pubkey = governance
+    instructions[0].keys[6].pubkey = proposalKey
+  }
 
   const proposalAddress = await withCreateProposal(
     instructions,
@@ -129,7 +151,8 @@ export const createProposal = async (
     options,
     useDenyOption,
     payer,
-    plugin?.voterWeightPk
+    plugin?.voterWeightPk,
+    proposalSeed
   )
 
   await withAddSignatory(

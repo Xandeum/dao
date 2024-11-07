@@ -130,5 +130,5 @@ export const getPlugins = async ({
     } while (programId)
   }
 
-  return plugins.reverse()
+  return plugins.length > 1 ? [plugins[0]] : plugins
 }

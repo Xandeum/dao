@@ -19,6 +19,7 @@ import QuadraticVotingPower from '@components/ProposalVotingPower/QuadraticVotin
 import VanillaVotingPower from '@components/GovernancePower/Power/Vanilla/VanillaVotingPower'
 import React from 'react'
 import ParclAccountDetails from 'ParclVotePlugin/components/ParclAccountDetails'
+import BonkBalanceCard from 'BonkVotePlugin/components/BalanceCard'
 
 const LockPluginTokenBalanceCard = dynamic(
   () =>
@@ -80,6 +81,7 @@ const TokenBalanceCardInner = ({
   const showGatewayCard = requiredCards?.includes('gateway')
   const showQvCard = requiredCards?.includes('QV')
   const showParclCard = requiredCards?.includes('parcl');
+  const showBonkCard = requiredCards?.includes('bonk');
 
   if (showDefaultVSRCard && inAccountDetails) {
     return <LockPluginTokenBalanceCard inAccountDetails={inAccountDetails} /> // does this ever actually occur in the component hierarchy?
@@ -110,6 +112,14 @@ const TokenBalanceCardInner = ({
         </div>
         <VanillaAccountDetails />
       </div>
+    )
+  }
+
+  if (showBonkCard) {
+    cards.push(
+      <React.Fragment key="bonk">
+        {<BonkBalanceCard />}
+      </React.Fragment>
     )
   }
 

@@ -40,6 +40,14 @@ export const PARCL_PLUGIN_PK: string[] = [
   '2gWf5xLAzZaKX9tQj9vuXsaxTWtzTZDFRn21J3zjNVgu',
 ]
 
+export const BONK_PLUGIN_PK = [
+  "EoKpGErCsD4UEbbY6LX4MLWBUjmoAxqKdU4fdtLuzK6M"
+]
+
+export const TOKEN_VOTER_PK = [
+  "HA99cuBQCCzZu1zuHN2qBxo2FBo1cxNLwKkdt6Prhy8v"
+]
+
 export const DRIFT_PLUGIN_PK = [DRIFT_STAKE_VOTER_PLUGIN]
 
 export type PluginName =
@@ -53,6 +61,8 @@ export type PluginName =
   | 'drift'
   | 'token_haver'
   | 'parcl'
+  | 'bonk'
+  | 'token_voter'
   | 'unknown'
 
 export const findPluginName = (programId: PublicKey | undefined): PluginName =>
@@ -76,6 +86,10 @@ export const findPluginName = (programId: PublicKey | undefined): PluginName =>
     ? 'token_haver'
     : PARCL_PLUGIN_PK.includes(programId.toString())
     ? 'parcl'
+    : BONK_PLUGIN_PK.includes(programId.toString())
+    ? 'bonk'
+    : TOKEN_VOTER_PK.includes(programId.toBase58())
+    ? 'token_voter'
     : 'unknown'
 
 // Used when creating a new realm to choose which voterWeightAddin to use
