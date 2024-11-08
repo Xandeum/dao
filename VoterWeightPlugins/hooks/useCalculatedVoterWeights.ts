@@ -5,8 +5,8 @@ import {
   VoterWeightPluginInfo,
 } from '../lib/types'
 import { calculateVoterWeight } from '../lib/calculateVoterWeights'
-import { useAsync, UseAsyncReturn } from 'react-async-hook'
 import {PublicKey} from "@solana/web3.js";
+import { useQuery } from '@tanstack/react-query';
 
 type Args = UseVoterWeightPluginsArgs & {
   realmPublicKey?: PublicKey
@@ -20,9 +20,14 @@ const argsAreSet = (args: Args): args is Required<Args> =>
     args.realmPublicKey !== undefined && args.governanceMintPublicKey !== undefined && args.walletPublicKeys !== undefined &&
     args.plugins !== undefined && args.tokenOwnerRecords !== undefined
 
-export const useCalculatedVoterWeights = (args: Args) : UseAsyncReturn<CalculatedWeight[] | undefined> =>
-    useAsync(
-        async () => {
+export function useCalculatedVoterWeights(args: Args) {
+    return useQuery({
+        queryKey: ['calculate-voter-weight', {
+            realmPublicKey: args.realmPublicKey,
+            governanceMintPublicKey: args.governanceMintPublicKey,
+            walletPublicKeys: args.walletPublicKeys?.map(k => k.toBase58())
+        }],
+        queryFn: async () => {
             if (!argsAreSet(args)) return undefined;
 
             const voterWeights = args.walletPublicKeys?.map(wallet => {
@@ -34,12 +39,6 @@ export const useCalculatedVoterWeights = (args: Args) : UseAsyncReturn<Calculate
                 });
             });
             return Promise.all(voterWeights);
-        },
-        [
-            args.realmPublicKey?.toString(),
-            args.governanceMintPublicKey?.toString(),
-            args.walletPublicKeys?.map(pubkey => pubkey.toString()).join(","),
-            args.tokenOwnerRecords?.map(tor => tor.account.governingTokenDepositAmount).join(","),
-            args.plugins?.length
-        ]
-    )
+        }
+    })
+}

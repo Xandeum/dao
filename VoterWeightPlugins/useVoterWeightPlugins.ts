@@ -68,11 +68,12 @@ export const useVoterWeightPlugins = (
   const walletTokenOwnerRecord = useTokenOwnerRecord(args.governanceMintPublicKey);
   const delegatedTokenOwnerRecords = useTokenOwnerRecordsDelegatedToUser().data;
   const { data: plugins } = usePlugins(args)
-  const { result: calculatedVoterWeights} = useCalculatedVoterWeights({
+  const calculatedVoterWeights = useCalculatedVoterWeights({
     ...args,
     plugins: plugins?.voterWeight,
     tokenOwnerRecords: [walletTokenOwnerRecord, ...(delegatedTokenOwnerRecords || [])].filter(Boolean) as ProgramAccount<TokenOwnerRecord>[],
-  })
+  }).data
+
   const { result: calculatedMaxVoterWeight} = useCalculatedMaxVoterWeight({
     ...args,
     plugins: plugins?.maxVoterWeight,
