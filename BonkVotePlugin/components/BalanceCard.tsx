@@ -7,7 +7,7 @@ import { useRealmVoterWeightPlugins } from "@hooks/useRealmVoterWeightPlugins"
 import useWalletOnePointOh from "@hooks/useWalletOnePointOh"
 import { GoverningTokenRole } from "@solana/spl-governance"
 
-const BonkBalanceCard = () => {
+const BonkBalanceCard = ({role} : {role?: 'community' | 'council'}) => {
   const mint = useRealmCommunityMintInfoQuery().data?.result
   const councilMint = useRealmCouncilMintInfoQuery().data?.result
   const realm = useRealmQuery().data?.result
@@ -45,7 +45,7 @@ const BonkBalanceCard = () => {
                         </div>
                       </div>
                     }
-                    {councilDepositVisible && (
+                    {councilDepositVisible && role !== 'community' && (
                       <TokenDeposit
                         mint={councilMint}
                         tokenRole={GoverningTokenRole.Council}
