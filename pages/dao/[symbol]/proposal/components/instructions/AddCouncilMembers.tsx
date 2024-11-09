@@ -142,7 +142,7 @@ const AddCouncilMembers = ({
         type="textarea"
         onChange={(evt) => handleAddressChange(evt.target.value)}
         error={formErrors['memberAddresses']}
-        className='h-40'
+        className='h-28'
       />
 
       <Input
