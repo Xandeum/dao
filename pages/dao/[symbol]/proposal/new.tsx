@@ -146,6 +146,7 @@ import SymmetryEditBasket from './components/instructions/Symmetry/SymmetryEditB
 import SymmetryDeposit from './components/instructions/Symmetry/SymmetryDeposit'
 import SymmetryWithdraw from './components/instructions/Symmetry/SymmetryWithdraw'
 import PythUpdatePoolAuthority from './components/instructions/Pyth/PythUpdatePoolAuthority'
+import PlaceLimitOrder from './components/instructions/Manifest/PlaceLimitOrder'
 
 const TITLE_LENGTH_LIMIT = 130
 // the true length limit is either at the tx size level, and maybe also the total account size level (I can't remember)
@@ -551,6 +552,7 @@ const New = () => {
       [Instructions.WithdrawValidatorStake]: WithdrawValidatorStake,
       [Instructions.DelegateStake]: DelegateStake,
       [Instructions.RemoveStakeLock]: RemoveLockup,
+      [Instructions.PlaceLimitOrder]: PlaceLimitOrder,
       [Instructions.SplitStake]: SplitStake,
       [Instructions.DifferValidatorStake]: null,
       [Instructions.TransferDomainName]: TransferDomainName,
