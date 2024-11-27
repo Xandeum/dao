@@ -9,19 +9,27 @@ import useGovernanceAssets from '@hooks/useGovernanceAssets'
 import { Governance } from '@solana/spl-governance'
 import { ProgramAccount } from '@solana/spl-governance'
 import { serializeInstructionToBase64 } from '@solana/spl-governance'
-import { AccountType, AssetAccount } from '@utils/uiTypes/assets'
+import { AssetAccount } from '@utils/uiTypes/assets'
 import InstructionForm, { InstructionInput } from '../FormCreator'
 import { InstructionInputType } from '../inputInstructionType'
-import UseMangoV4 from '../../../../../../../hooks/useMangoV4'
 import useWalletOnePointOh from '@hooks/useWalletOnePointOh'
 import ProgramSelector from '@components/Mango/ProgramSelector'
 import useProgramSelector from '@components/Mango/useProgramSelector'
+import { ManifestClient, Market } from '@cks-systems/manifest-sdk'
+import useLegacyConnectionContext from '@hooks/useLegacyConnectionContext'
+import { useRealmProposalsQuery } from '@hooks/queries/proposal'
+import tokenPriceService from '@utils/services/tokenPrice'
+import { string } from 'superstruct'
 
 interface PlaceLimitOrderForm {
   governedAccount: AssetAccount | null
-  index: number
-  addressLookupTable: string
-  holdupTime: number
+  market: string
+  amount: string
+  price: string
+  side: {
+    name: string
+    value: string
+  }
 }
 
 const PlaceLimitOrder = ({
@@ -32,25 +40,34 @@ const PlaceLimitOrder = ({
   governance: ProgramAccount<Governance> | null
 }) => {
   const wallet = useWalletOnePointOh()
-  const programSelectorHook = useProgramSelector()
-
-  const { mangoClient, mangoGroup } = UseMangoV4(
-    programSelectorHook.program?.val,
-    programSelectorHook.program?.group
-  )
+  const connection = useLegacyConnectionContext()
+  const proposals = useRealmProposalsQuery().data
   const { assetAccounts } = useGovernanceAssets()
-  const solAccounts = assetAccounts.filter(
-    (x) =>
-      x.type === AccountType.SOL &&
-      mangoGroup?.admin &&
-      x.extensions.transferAddress?.equals(mangoGroup.admin)
-  )
+  const [availableMarkets, setAvailableMarkets] = useState<
+    {
+      name: string
+      value: string
+      quote: string
+      base: string
+    }[]
+  >([])
+  const sideOptions = [
+    {
+      name: 'Buy',
+      value: 'Buy',
+    },
+    {
+      name: 'Sell',
+      value: 'Sell',
+    },
+  ]
   const shouldBeGoverned = !!(index !== 0 && governance)
   const [form, setForm] = useState<PlaceLimitOrderForm>({
     governedAccount: null,
-    addressLookupTable: '',
-    index: 0,
-    holdupTime: 0,
+    market: '',
+    amount: '0',
+    price: '0',
+    side: sideOptions[0],
   })
   const [formErrors, setFormErrors] = useState({})
   const { handleSetInstructions } = useContext(NewProposalContext)
@@ -68,25 +85,61 @@ const PlaceLimitOrder = ({
       form.governedAccount?.governance?.account &&
       wallet?.publicKey
     ) {
-      const ix = await mangoClient!.program.methods
-        .altSet(Number(form.index))
-        .accounts({
-          group: mangoGroup!.publicKey,
-          admin: form.governedAccount.extensions.transferAddress,
-          addressLookupTable: new PublicKey(form.addressLookupTable),
-        })
-        .instruction()
+      const mClient = await ManifestClient.getClientForMarketNoPrivateKey(
+        connection.current,
+        PublicKey.default,
+        form.governedAccount.governance.nativeTreasuryAddress
+      )
 
+      const ix = await mClient.placeOrderIx({
+        numBaseTokens: Number(form.amount),
+        tokenPrice: Number(form.price),
+        isBid: form.side.value === 'Buy',
+        lastValidSlot: 0,
+        //Limit order is 0, there is import problem in sdk
+        orderType: 0,
+        clientOrderId: proposals!.length,
+      })
       serializedInstruction = serializeInstructionToBase64(ix)
     }
     const obj: UiInstruction = {
       serializedInstruction: serializedInstruction,
       isValid,
       governance: form.governedAccount?.governance,
-      customHoldUpTime: form.holdupTime,
+      customHoldUpTime: 0,
     }
     return obj
   }
+
+  useEffect(() => {
+    const getMarkets = async () => {
+      const marketAccounts = await ManifestClient.getMarketProgramAccounts(
+        connection.current
+      )
+
+      const markets = marketAccounts
+        .map((x) =>
+          Market.loadFromBuffer({
+            address: x.pubkey,
+            buffer: x.account.data,
+          })
+        )
+        .sort((a, b) => Number(b.quoteVolume()) - Number(a.quoteVolume()))
+        .map((x) => ({
+          name: `${
+            tokenPriceService.getTokenInfo(x.baseMint().toBase58())?.name
+          }/${tokenPriceService.getTokenInfo(x.quoteMint().toBase58())?.name}`,
+          value: x.address.toBase58(),
+          quote: x.quoteMint().toBase58(),
+          base: x.baseMint().toBase58(),
+        }))
+
+      setAvailableMarkets(markets)
+    }
+    if (connection && assetAccounts.length) {
+      getMarkets()
+    }
+  }, [connection, assetAccounts])
 
   useEffect(() => {
     handleSetInstructions(
@@ -100,15 +153,25 @@ const PlaceLimitOrder = ({
       .object()
       .nullable()
       .required('Program governed account is required'),
-    addressLookupTable: yup
-      .string()
-      .required()
-      .test('is-valid-address', 'Please enter a valid PublicKey', (value) =>
-        value ? validatePubkey(value) : true
-      ),
-    index: yup.string().required(),
   })
   const inputs: InstructionInput[] = [
+    {
+      label: 'Market',
+      initialValue: form.market,
+      name: 'market',
+      type: InstructionInputType.SELECT,
+      options: availableMarkets,
+    },
+    {
+      label: 'Side',
+      initialValue: form.side,
+      name: 'side',
+      type: InstructionInputType.SELECT,
+      options: sideOptions,
+    },
+    //check quote and base
+    //check sell or buy
+    //validate if there is available quote or base in treasury
     {
       label: 'Governance',
       initialValue: form.governedAccount,
@@ -116,35 +179,13 @@ const PlaceLimitOrder = ({
       type: InstructionInputType.GOVERNED_ACCOUNT,
       shouldBeGoverned: shouldBeGoverned as any,
       governance: governance,
-      options: solAccounts,
-    },
-    {
-      label: 'Instruction hold up time (days)',
-      initialValue: form.holdupTime,
-      type: InstructionInputType.INPUT,
-      inputType: 'number',
-      name: 'holdupTime',
-    },
-    {
-      label: 'Address Lookup Table',
-      initialValue: form.addressLookupTable,
-      type: InstructionInputType.INPUT,
-      name: 'addressLookupTable',
-    },
-    {
-      label: 'Index',
-      initialValue: form.index,
-      type: InstructionInputType.INPUT,
-      inputType: 'number',
-      name: 'index',
+      options: assetAccounts,
+      assetType: 'token',
     },
   ]
 
   return (
     <>
-      <ProgramSelector
-        programSelectorHook={programSelectorHook}
-      ></ProgramSelector>
       {form && (
         <InstructionForm
           outerForm={form}
