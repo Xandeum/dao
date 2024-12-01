@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { useContext, useEffect, useState } from 'react'
-import { PublicKey } from '@solana/web3.js'
+import {
+  Keypair,
+  PublicKey,
+  SystemProgram,
+  TransactionInstruction,
+} from '@solana/web3.js'
 import * as yup from 'yup'
 import { isFormValid, validatePubkey } from '@utils/formValidation'
 import { UiInstruction } from '@utils/uiTypes/proposalCreationTypes'
@@ -13,17 +18,28 @@ import { AssetAccount } from '@utils/uiTypes/assets'
 import InstructionForm, { InstructionInput } from '../FormCreator'
 import { InstructionInputType } from '../inputInstructionType'
 import useWalletOnePointOh from '@hooks/useWalletOnePointOh'
-import ProgramSelector from '@components/Mango/ProgramSelector'
-import useProgramSelector from '@components/Mango/useProgramSelector'
-import { ManifestClient, Market } from '@cks-systems/manifest-sdk'
+import { ManifestClient, Market, UiWrapper } from '@cks-systems/manifest-sdk'
 import useLegacyConnectionContext from '@hooks/useLegacyConnectionContext'
 import { useRealmProposalsQuery } from '@hooks/queries/proposal'
 import tokenPriceService from '@utils/services/tokenPrice'
-import { string } from 'superstruct'
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
+import { WRAPPED_SOL_MINT } from '@metaplex-foundation/js'
+import {
+  createAssociatedTokenAccountIdempotentInstruction,
+  createCloseAccountInstruction,
+  createSyncNativeInstruction,
+  getAssociatedTokenAddressSync,
+} from '@solana/spl-token-new'
+import { toNative } from '@blockworks-foundation/mango-v4'
 
 interface PlaceLimitOrderForm {
   governedAccount: AssetAccount | null
-  market: string
+  market: {
+    name: string
+    value: string
+    quote: string
+    base: string
+  } | null
   amount: string
   price: string
   side: {
@@ -64,7 +80,7 @@ const PlaceLimitOrder = ({
   const shouldBeGoverned = !!(index !== 0 && governance)
   const [form, setForm] = useState<PlaceLimitOrderForm>({
     governedAccount: null,
-    market: '',
+    market: null,
     amount: '0',
     price: '0',
     side: sideOptions[0],
@@ -79,34 +95,109 @@ const PlaceLimitOrder = ({
   }
   async function getInstruction(): Promise<UiInstruction> {
     const isValid = await validateInstruction()
-    let serializedInstruction = ''
+    const ixes: string[] = []
+    const signers: Keypair[] = []
+    const prerequisiteInstructions: TransactionInstruction[] = []
     if (
       isValid &&
       form.governedAccount?.governance?.account &&
       wallet?.publicKey
     ) {
-      const mClient = await ManifestClient.getClientForMarketNoPrivateKey(
+      const isBid = form.side.value === 'Buy'
+      const owner = form.governedAccount.extensions.transferAddress!
+      const wrapper = await UiWrapper.fetchFirstUserWrapper(
         connection.current,
-        PublicKey.default,
-        form.governedAccount.governance.nativeTreasuryAddress
+        form.governedAccount.extensions.transferAddress!
       )
-
-      const ix = await mClient.placeOrderIx({
-        numBaseTokens: Number(form.amount),
-        tokenPrice: Number(form.price),
-        isBid: form.side.value === 'Buy',
-        lastValidSlot: 0,
-        //Limit order is 0, there is import problem in sdk
-        orderType: 0,
-        clientOrderId: proposals!.length,
+      const market = await Market.loadFromAddress({
+        connection: connection.current,
+        address: new PublicKey(form.market!.value),
       })
-      serializedInstruction = serializeInstructionToBase64(ix)
+      let wrapperPk = wrapper?.pubkey
+      const needToCreateWSolAcc = !isBid
+        ? market.baseMint().equals(WRAPPED_SOL_MINT)
+        : market.quoteMint().equals(WRAPPED_SOL_MINT)
+
+      if (needToCreateWSolAcc) {
+        const wsolAta = getAssociatedTokenAddressSync(
+          WRAPPED_SOL_MINT,
+          owner,
+          true
+        )
+        const createPayerAtaIx = createAssociatedTokenAccountIdempotentInstruction(
+          owner,
+          wsolAta,
+          owner,
+          WRAPPED_SOL_MINT
+        )
+        const solTransferIx = SystemProgram.transfer({
+          fromPubkey: wallet.publicKey!,
+          toPubkey: wsolAta,
+          lamports: toNative(
+            Number(
+              !isBid ? form.amount : Number(form.amount) * Number(form.price)
+            ),
+            9
+          ).toNumber(),
+        })
+
+        const syncNative = createSyncNativeInstruction(wsolAta)
+        ixes.push(
+          serializeInstructionToBase64(createPayerAtaIx),
+          serializeInstructionToBase64(solTransferIx),
+          serializeInstructionToBase64(syncNative)
+        )
+      }
+
+      if (!wrapperPk) {
+        const setup = await UiWrapper.setupIxs(
+          connection.current,
+          owner,
+          wallet.publicKey
+        )
+        wrapperPk = setup.signers[0].publicKey
+      }
+      const placeIx = await UiWrapper['placeIx_'](
+        market,
+        {
+          wrapper: wrapperPk!,
+          owner,
+          payer: owner,
+          baseTokenProgram: TOKEN_PROGRAM_ID,
+          quoteTokenProgram: TOKEN_PROGRAM_ID,
+        },
+        {
+          isBid: isBid,
+          amount: Number(form.amount),
+          price: Number(form.price),
+        }
+      )
+      ixes.push(...placeIx.ixs.map((x) => serializeInstructionToBase64(x)))
+      signers.push(
+        ...placeIx.signers.map((x) => Keypair.fromSecretKey(x.secretKey))
+      )
+      if (needToCreateWSolAcc) {
+        const wsolAta = getAssociatedTokenAddressSync(
+          WRAPPED_SOL_MINT,
+          owner,
+          true
+        )
+        const solTransferIx = createCloseAccountInstruction(
+          wsolAta,
+          owner,
+          owner
+        )
+        ixes.push(serializeInstructionToBase64(solTransferIx))
+      }
     }
     const obj: UiInstruction = {
-      serializedInstruction: serializedInstruction,
+      serializedInstruction: '',
+      additionalSerializedInstructions: ixes,
+      prerequisiteInstructions: prerequisiteInstructions,
       isValid,
       governance: form.governedAccount?.governance,
       customHoldUpTime: 0,
+      chunkBy: 1,
     }
     return obj
   }
@@ -181,6 +272,18 @@ const PlaceLimitOrder = ({
       governance: governance,
       options: assetAccounts,
       assetType: 'token',
+    },
+    {
+      label: 'Amount',
+      initialValue: form.amount,
+      name: 'amount',
+      type: InstructionInputType.INPUT,
+    },
+    {
+      label: 'Price',
+      initialValue: form.price,
+      name: 'price',
+      type: InstructionInputType.INPUT,
     },
   ]
 
