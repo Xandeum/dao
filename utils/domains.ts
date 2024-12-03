@@ -88,17 +88,8 @@ export const fetchDomainsByPubkey = async (
   const tld_domains = await parser.getParsedAllUserDomains(pubkey)
   const results: Domain[] = []
 
-  if (sns_domains.length > 0) {
-    const reverse = await performReverseLookupBatch(connection, sns_domains)
-
-    for (let i = 0; i < sns_domains.length; i++) {
-      results.push({
-        domainAddress: sns_domains[i].toBase58(),
-        domainName: reverse[i],
-        type: 'sns',
-      })
-    }
-  }
+  console.log('SNS domains:', sns_domains)
+  console.log('TLD domains:', tld_domains)
 
   if (tld_domains.length > 0) {
     for (let i = 0; i < tld_domains.length; i++) {
@@ -106,6 +97,18 @@ export const fetchDomainsByPubkey = async (
         domainAddress: tld_domains[i].domain,
         domainName: tld_domains[i].nameAccount.toBase58(),
         type: 'alldomains',
+      })
+    }
+  }
+
+  if (sns_domains.length > 0) {
+    const reverse = await performReverseLookupBatch(connection, sns_domains)
+
+    for (let i = 0; i < sns_domains.length; i++) {
+      results.push({
+        domainAddress: sns_domains[i].toBase58(),
+        domainName: reverse[i] + '.sol',
+        type: 'sns',
       })
     }
   }
