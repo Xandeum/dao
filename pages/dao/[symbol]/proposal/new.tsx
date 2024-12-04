@@ -361,12 +361,23 @@ const New = () => {
         const additionalInstructions = instructions
           .flatMap((instruction) =>
             instruction.additionalSerializedInstructions
-              ?.filter(
-                (value, index, self) =>
-                  index === self.findIndex((t) => t === value)
+              ?.filter((value, index, self) =>
+                typeof value === 'string'
+                  ? index === self.findIndex((t) => t === value)
+                  : index ===
+                    self.findIndex((t) =>
+                      typeof t !== 'string'
+                        ? t.serializedInstruction ===
+                          value.serializedInstruction
+                        : -1
+                    )
               )
               .map((x) => ({
-                data: x ? getInstructionDataFromBase64(x) : null,
+                data: x
+                  ? getInstructionDataFromBase64(
+                      typeof x === 'string' ? x : x.serializedInstruction
+                    )
+                  : null,
                 ...getDefaultInstructionProps(instruction, governance),
               }))
           )

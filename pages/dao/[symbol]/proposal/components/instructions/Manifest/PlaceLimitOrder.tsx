@@ -26,11 +26,19 @@ import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { WRAPPED_SOL_MINT } from '@metaplex-foundation/js'
 import {
   createAssociatedTokenAccountIdempotentInstruction,
+  createAssociatedTokenAccountInstruction,
   createCloseAccountInstruction,
   createSyncNativeInstruction,
   getAssociatedTokenAddressSync,
 } from '@solana/spl-token-new'
 import { toNative } from '@blockworks-foundation/mango-v4'
+import { utils, uiWrapper } from '@cks-systems/manifest-sdk'
+const { getVaultAddress } = utils
+const { createSettleFundsInstruction } = uiWrapper
+
+const MANIFEST_PROGRAM_ID = new PublicKey(
+  'MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms'
+)
 
 interface PlaceLimitOrderForm {
   governedAccount: AssetAccount | null
@@ -46,6 +54,7 @@ interface PlaceLimitOrderForm {
     name: string
     value: string
   }
+  settlingHoldUp: number
 }
 
 const PlaceLimitOrder = ({
@@ -84,6 +93,7 @@ const PlaceLimitOrder = ({
     amount: '0',
     price: '0',
     side: sideOptions[0],
+    settlingHoldUp: 0,
   })
   const [formErrors, setFormErrors] = useState({})
   const { handleSetInstructions } = useContext(NewProposalContext)
@@ -95,7 +105,13 @@ const PlaceLimitOrder = ({
   }
   async function getInstruction(): Promise<UiInstruction> {
     const isValid = await validateInstruction()
-    const ixes: string[] = []
+    const ixes: (
+      | string
+      | {
+          serializedInstruction: string
+          holdupTime: number
+        }
+    )[] = []
     const signers: Keypair[] = []
     const prerequisiteInstructions: TransactionInstruction[] = []
     if (
@@ -104,19 +120,22 @@ const PlaceLimitOrder = ({
       wallet?.publicKey
     ) {
       const isBid = form.side.value === 'Buy'
-      const owner = form.governedAccount.extensions.transferAddress!
+      const owner = form.governedAccount.extensions.token!.account.owner
       const wrapper = await UiWrapper.fetchFirstUserWrapper(
         connection.current,
-        form.governedAccount.extensions.transferAddress!
+        owner
       )
       const market = await Market.loadFromAddress({
         connection: connection.current,
         address: new PublicKey(form.market!.value),
       })
+      const quoteMint = market.quoteMint()
+      const baseMint = market.baseMint()
       let wrapperPk = wrapper?.pubkey
+
       const needToCreateWSolAcc = !isBid
-        ? market.baseMint().equals(WRAPPED_SOL_MINT)
-        : market.quoteMint().equals(WRAPPED_SOL_MINT)
+        ? baseMint.equals(WRAPPED_SOL_MINT)
+        : quoteMint.equals(WRAPPED_SOL_MINT)
 
       if (needToCreateWSolAcc) {
         const wsolAta = getAssociatedTokenAddressSync(
@@ -131,7 +150,7 @@ const PlaceLimitOrder = ({
           WRAPPED_SOL_MINT
         )
         const solTransferIx = SystemProgram.transfer({
-          fromPubkey: wallet.publicKey!,
+          fromPubkey: owner,
           toPubkey: wsolAta,
           lamports: toNative(
             Number(
@@ -156,6 +175,11 @@ const PlaceLimitOrder = ({
           wallet.publicKey
         )
         wrapperPk = setup.signers[0].publicKey
+
+        prerequisiteInstructions.push(...setup.ixs)
+        signers.push(
+          ...setup.signers.map((x) => Keypair.fromSecretKey(x.secretKey))
+        )
       }
       const placeIx = await UiWrapper['placeIx_'](
         market,
@@ -173,9 +197,82 @@ const PlaceLimitOrder = ({
         }
       )
       ixes.push(...placeIx.ixs.map((x) => serializeInstructionToBase64(x)))
-      signers.push(
-        ...placeIx.signers.map((x) => Keypair.fromSecretKey(x.secretKey))
+
+      const traderTokenAccountBase = getAssociatedTokenAddressSync(
+        baseMint,
+        owner,
+        true,
+        TOKEN_PROGRAM_ID
       )
+      const traderTokenAccountQuote = getAssociatedTokenAddressSync(
+        quoteMint,
+        owner,
+        true,
+        TOKEN_PROGRAM_ID
+      )
+
+      const [baseAtaAccount, quoteAtaAccount] = await Promise.all([
+        connection.current.getAccountInfo(traderTokenAccountBase),
+        connection.current.getAccountInfo(traderTokenAccountQuote),
+      ])
+
+      const doesTheBaseAtaExisits =
+        baseAtaAccount && baseAtaAccount?.lamports > 0
+      const doesTheQuoteAtaExisits =
+        quoteAtaAccount && quoteAtaAccount?.lamports > 0
+
+      if (!doesTheQuoteAtaExisits) {
+        const quoteAtaCreateIx = createAssociatedTokenAccountInstruction(
+          owner,
+          traderTokenAccountQuote,
+          owner,
+          quoteMint,
+          TOKEN_PROGRAM_ID
+        )
+        ixes.push({
+          serializedInstruction: serializeInstructionToBase64(quoteAtaCreateIx),
+          holdupTime: form.settlingHoldUp,
+        })
+      }
+      if (!doesTheBaseAtaExisits) {
+        const baseAtaCreateIx = createAssociatedTokenAccountInstruction(
+          owner,
+          traderTokenAccountBase,
+          owner,
+          baseMint,
+          TOKEN_PROGRAM_ID
+        )
+        ixes.push({
+          serializedInstruction: serializeInstructionToBase64(baseAtaCreateIx),
+          holdupTime: form.settlingHoldUp,
+        })
+      }
+
+      const settleOrderIx: TransactionInstruction = createSettleFundsInstruction(
+        {
+          wrapperState: wrapperPk,
+          owner: owner,
+          market: market.address,
+          manifestProgram: MANIFEST_PROGRAM_ID,
+          traderTokenAccountBase: traderTokenAccountBase,
+          traderTokenAccountQuote: traderTokenAccountQuote,
+          vaultBase: getVaultAddress(market.address, baseMint),
+          vaultQuote: getVaultAddress(market.address, quoteMint),
+          mintBase: baseMint,
+          mintQuote: quoteMint,
+          tokenProgramBase: TOKEN_PROGRAM_ID,
+          tokenProgramQuote: TOKEN_PROGRAM_ID,
+          platformTokenAccount: traderTokenAccountQuote,
+        },
+        {
+          params: { feeMantissa: 0, platformFeePercent: 100 },
+        }
+      )
+      ixes.push({
+        serializedInstruction: serializeInstructionToBase64(settleOrderIx),
+        holdupTime: form.settlingHoldUp,
+      })
+
       if (needToCreateWSolAcc) {
         const wsolAta = getAssociatedTokenAddressSync(
           WRAPPED_SOL_MINT,
@@ -187,13 +284,17 @@ const PlaceLimitOrder = ({
           owner,
           owner
         )
-        ixes.push(serializeInstructionToBase64(solTransferIx))
+        ixes.push({
+          serializedInstruction: serializeInstructionToBase64(solTransferIx),
+          holdupTime: form.settlingHoldUp,
+        })
       }
     }
     const obj: UiInstruction = {
       serializedInstruction: '',
       additionalSerializedInstructions: ixes,
       prerequisiteInstructions: prerequisiteInstructions,
+      prerequisiteInstructionsSigners: signers,
       isValid,
       governance: form.governedAccount?.governance,
       customHoldUpTime: 0,
@@ -283,6 +384,12 @@ const PlaceLimitOrder = ({
       label: 'Price',
       initialValue: form.price,
       name: 'price',
+      type: InstructionInputType.INPUT,
+    },
+    {
+      label: 'Settling holdup',
+      initialValue: form.settlingHoldUp,
+      name: 'settlingHoldUp',
       type: InstructionInputType.INPUT,
     },
   ]

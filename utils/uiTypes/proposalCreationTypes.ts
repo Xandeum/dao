@@ -33,7 +33,13 @@ export enum PackageEnum {
 
 export interface UiInstruction {
   serializedInstruction: string
-  additionalSerializedInstructions?: string[]
+  additionalSerializedInstructions?: (
+    | string
+    | {
+        serializedInstruction: string
+        holdupTime: number
+      }
+  )[]
   isValid: boolean
   governance: ProgramAccount<Governance> | undefined
   customHoldUpTime?: number
