@@ -335,11 +335,18 @@ export const createProposal = async (
       sequenceType: SequenceType.Sequential,
     })
 
+    const lookupTableAddress = new PublicKey("2Qc5eoLhhndjocKXN7YN9q43Lw138xiMeXsEMKAoGQBn")
+
+    const lookupTableAccount = await connection
+    .getAddressLookupTable(lookupTableAddress, { commitment: 'singleGossip' })
+    .then((res) => res.value)
+
     await sendTransactionsV3({
       connection,
       wallet,
       transactionInstructions: instructionsChunks,
       callbacks,
+      lookupTableAccounts: [lookupTableAccount]
     })
   }
 

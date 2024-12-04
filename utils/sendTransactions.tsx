@@ -1,5 +1,5 @@
 import { SignerWalletAdapter } from '@solana/wallet-adapter-base'
-import { TransactionInstruction, Keypair, ComputeBudgetProgram } from '@solana/web3.js'
+import { TransactionInstruction, Keypair, ComputeBudgetProgram, TransactionMessage, VersionedTransaction } from '@solana/web3.js'
 import {
   closeTransactionProcessUi,
   incrementProcessedTransactions,
@@ -18,6 +18,7 @@ import { TransactionInstructionWithSigners } from '@blockworks-foundation/mangol
 import { createComputeBudgetIx } from '@blockworks-foundation/mango-v4'
 import { BACKUP_CONNECTIONS } from './connection'
 import { ComputeBudgetService } from './services/computeBudget'
+import { bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes'
 
 export type WalletSigner = Pick<
   SignerWalletAdapter,
@@ -97,27 +98,7 @@ export const sendTransactionsV3 = async ({
         callbacks?.afterEveryTxConfirmation()
       }
       incrementProcessedTransactions()
-    },
-    onError: (e, notProcessedTransactions, originalProps) => {
-      if (callbacks?.onError) {
-        callbacks?.onError(e, notProcessedTransactions, originalProps)
-      }
-      showTransactionError(
-        () =>
-          sendTransactionsV3({
-            ...originalProps,
-            transactionInstructions: notProcessedTransactions,
-            autoFee: false,
-          }),
-        getErrorMsg(e),
-        e.txid
-      )
-      transactionInstructionsWithFee.forEach((x) =>
-        x.instructionsSet.forEach((x) =>
-          invalidateInstructionAccounts(x.transactionInstruction)
-        )
-      )
-    },
+    }
   }
 
   const cfg = {
@@ -133,6 +114,96 @@ export const sendTransactionsV3 = async ({
     logFlowInfo: true,
     ...config,
   }
+
+  const recentBlockhash = await connection.getLatestBlockhash()
+  const blockhash = recentBlockhash.blockhash
+  const lastValidBlockHeight = recentBlockhash.lastValidBlockHeight
+
+  console.log(transactionInstructionsWithFee, "tx with fee")
+
+  const txes: VersionedTransaction[] = []
+
+  for (const tx of transactionInstructionsWithFee) {
+    const messageV0 = new TransactionMessage({
+      payerKey: wallet.publicKey,
+      recentBlockhash: blockhash,
+      instructions: tx.instructionsSet.map(o => o.transactionInstruction), // note this is an array of instructions
+    }).compileToV0Message(lookupTableAccounts);
+
+    const transactionV0 = new VersionedTransaction(messageV0);
+    txes.push(transactionV0)
+  }
+
+  const signedTxs = await wallet.signAllTransactions!(txes)
+  
+  let finalTxSig = ""
+    for (const signedTx of signedTxs) {
+        let txSignature: string | null = null
+        let confirmTransactionPromise:any = null
+        let confirmedTx = null
+    
+        const signatureRaw = signedTx.signatures[0]
+        txSignature = bs58.encode(signatureRaw)
+        
+        let txSendAttempts = 1
+    
+        try {
+            console.log(`${new Date().toISOString()} Subscribing to transaction confirmation`);
+        
+            confirmTransactionPromise = connection.confirmTransaction(
+                {
+                    signature: txSignature,
+                    blockhash,
+                    lastValidBlockHeight,
+                },
+                "confirmed"
+            );
+        
+            console.log(`${new Date().toISOString()} Sending Transaction ${txSignature}`);
+    
+            await connection.sendRawTransaction(signedTx.serialize(), {
+                skipPreflight: false,
+                maxRetries: 0,
+            });
+        
+            confirmedTx = null
+            while (!confirmedTx) {
+                confirmedTx = await Promise.race([
+                    confirmTransactionPromise,
+                    new Promise((resolve) =>
+                        setTimeout(() => {
+                            resolve(null);
+                        }, 30000)
+                    )
+                ])
+    
+                if (confirmedTx) {
+                    break
+                }
+        
+                console.log(`${new Date().toISOString()} Tx not confirmed after ${3000 * txSendAttempts++}ms, resending`);
+        
+                await connection.sendRawTransaction(signedTx.serialize(), {
+                    skipPreflight: false,
+                    maxRetries: 0,
+                });
+            }
+        } catch (error) {
+            console.error(error);
+            throw new Error(JSON.stringify(error))
+        }
+
+        if (!confirmedTx) {
+            console.log("Transaction Failed!")
+            throw new Error("Transaction Failed")
+        }
+    
+        console.log("Transaction is successful.", txSignature)
+        finalTxSig = txSignature
+    }
+
+    return finalTxSig
+  return
   return sendSignAndConfirmTransactions({
     connection,
     wallet,

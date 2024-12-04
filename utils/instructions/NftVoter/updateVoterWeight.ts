@@ -51,7 +51,7 @@ export const getUpdateVoterWeightRecordInstruction = async (
       registrar: registrar,
       voterWeightRecord: voterWeightPk,
     })
-    .remainingAccounts(remainingAccounts.slice(0, 10))
+    .remainingAccounts(remainingAccounts.slice(0, 20))
     .instruction()
   return updateVoterWeightRecordIx
 }
