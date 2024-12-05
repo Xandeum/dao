@@ -11,7 +11,7 @@ import { isFormValid, validatePubkey } from '@utils/formValidation'
 import { UiInstruction } from '@utils/uiTypes/proposalCreationTypes'
 import { NewProposalContext } from '../../../new'
 import useGovernanceAssets from '@hooks/useGovernanceAssets'
-import { Governance } from '@solana/spl-governance'
+import { Governance, SYSTEM_PROGRAM_ID } from '@solana/spl-governance'
 import { ProgramAccount } from '@solana/spl-governance'
 import { serializeInstructionToBase64 } from '@solana/spl-governance'
 import { AssetAccount } from '@utils/uiTypes/assets'
@@ -33,6 +33,7 @@ import {
 } from '@solana/spl-token-new'
 import { toNative } from '@blockworks-foundation/mango-v4'
 import { utils, uiWrapper } from '@cks-systems/manifest-sdk'
+import { createCancelOrderInstruction } from '@cks-systems/manifest-sdk/dist/types/src/ui_wrapper'
 const { getVaultAddress } = utils
 const { createSettleFundsInstruction } = uiWrapper
 
@@ -93,7 +94,7 @@ const PlaceLimitOrder = ({
     amount: '0',
     price: '0',
     side: sideOptions[0],
-    settlingHoldUp: 0,
+    settlingHoldUp: 5,
   })
   const [formErrors, setFormErrors] = useState({})
   const { handleSetInstructions } = useContext(NewProposalContext)
@@ -109,7 +110,7 @@ const PlaceLimitOrder = ({
       | string
       | {
           serializedInstruction: string
-          holdupTime: number
+          holdUpTime: number
         }
     )[] = []
     const signers: Keypair[] = []
@@ -119,6 +120,7 @@ const PlaceLimitOrder = ({
       form.governedAccount?.governance?.account &&
       wallet?.publicKey
     ) {
+      const orderId = Date.now()
       const isBid = form.side.value === 'Buy'
       const owner = form.governedAccount.extensions.token!.account.owner
       const wrapper = await UiWrapper.fetchFirstUserWrapper(
@@ -194,6 +196,7 @@ const PlaceLimitOrder = ({
           isBid: isBid,
           amount: Number(form.amount),
           price: Number(form.price),
+          orderId: orderId,
         }
       )
       ixes.push(...placeIx.ixs.map((x) => serializeInstructionToBase64(x)))
@@ -231,7 +234,7 @@ const PlaceLimitOrder = ({
         )
         ixes.push({
           serializedInstruction: serializeInstructionToBase64(quoteAtaCreateIx),
-          holdupTime: form.settlingHoldUp,
+          holdUpTime: form.settlingHoldUp,
         })
       }
       if (!doesTheBaseAtaExisits) {
@@ -244,9 +247,31 @@ const PlaceLimitOrder = ({
         )
         ixes.push({
           serializedInstruction: serializeInstructionToBase64(baseAtaCreateIx),
-          holdupTime: form.settlingHoldUp,
+          holdUpTime: form.settlingHoldUp,
         })
       }
+
+      const mint = isBid ? quoteMint : baseMint
+      const cancelOrderIx: TransactionInstruction = createCancelOrderInstruction(
+        {
+          wrapperState: wrapperPk,
+          owner: owner,
+          traderTokenAccount: getAssociatedTokenAddressSync(mint, owner, true),
+          market: market.address,
+          vault: getVaultAddress(market.address, mint),
+          mint: mint,
+          systemProgram: SYSTEM_PROGRAM_ID,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          manifestProgram: MANIFEST_PROGRAM_ID,
+        },
+        {
+          params: { clientOrderId: orderId },
+        }
+      )
+      ixes.push({
+        serializedInstruction: serializeInstructionToBase64(cancelOrderIx),
+        holdUpTime: form.settlingHoldUp,
+      })
 
       const settleOrderIx: TransactionInstruction = createSettleFundsInstruction(
         {
@@ -265,12 +290,12 @@ const PlaceLimitOrder = ({
           platformTokenAccount: traderTokenAccountQuote,
         },
         {
-          params: { feeMantissa: 0, platformFeePercent: 100 },
+          params: { feeMantissa: 10 ** 9 * 0.0001, platformFeePercent: 100 },
         }
       )
       ixes.push({
         serializedInstruction: serializeInstructionToBase64(settleOrderIx),
-        holdupTime: form.settlingHoldUp,
+        holdUpTime: form.settlingHoldUp,
       })
 
       if (needToCreateWSolAcc) {
@@ -286,7 +311,7 @@ const PlaceLimitOrder = ({
         )
         ixes.push({
           serializedInstruction: serializeInstructionToBase64(solTransferIx),
-          holdupTime: form.settlingHoldUp,
+          holdUpTime: form.settlingHoldUp,
         })
       }
     }
@@ -387,7 +412,7 @@ const PlaceLimitOrder = ({
       type: InstructionInputType.INPUT,
     },
     {
-      label: 'Settling holdup',
+      label: 'Settling instruction holdup (minutes)',
       initialValue: form.settlingHoldUp,
       name: 'settlingHoldUp',
       type: InstructionInputType.INPUT,

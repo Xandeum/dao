@@ -37,7 +37,7 @@ export interface UiInstruction {
     | string
     | {
         serializedInstruction: string
-        holdupTime: number
+        holdUpTime: number
       }
   )[]
   isValid: boolean
