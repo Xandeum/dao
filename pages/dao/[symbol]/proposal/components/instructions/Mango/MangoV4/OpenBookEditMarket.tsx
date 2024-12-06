@@ -53,8 +53,10 @@ const OpenBookEditMarket = ({
   const solAccounts = assetAccounts.filter(
     (x) =>
       x.type === AccountType.SOL &&
-      mangoGroup?.admin &&
-      x.extensions.transferAddress?.equals(mangoGroup.admin)
+      ((mangoGroup?.admin &&
+        x.extensions.transferAddress?.equals(mangoGroup.admin)) ||
+        (mangoGroup?.securityAdmin &&
+          x.extensions.transferAddress?.equals(mangoGroup.securityAdmin)))
   )
   const shouldBeGoverned = !!(index !== 0 && governance)
   const [form, setForm] = useState<OpenBookEditMarketForm>({
@@ -89,10 +91,12 @@ const OpenBookEditMarket = ({
 
       const ix = await mangoClient!.program.methods
         .serum3EditMarket(
-          form.reduceOnly,
-          form.forceClose,
-          form.name,
-          form.oraclePriceBand
+          form.reduceOnly !== market?.reduceOnly ? form.reduceOnly : null,
+          form.forceClose !== market?.forceClose ? form.forceClose : null,
+          form.name !== market?.name ? form.name : null,
+          form.oraclePriceBand !== market?.oraclePriceBand
+            ? form.oraclePriceBand
+            : null
         )
         .accounts({
           group: mangoGroup!.publicKey,
