@@ -311,7 +311,7 @@ const AddMemberForm: FC<{ close: () => void; mintAccount: AssetAccount }> = ({
           className="p-4 w-full bg-bkg-3 border border-bkg-3 default-transition text-sm text-fgd-1 rounded-md focus:border-bkg-3 focus:outline-none"
           wrapperClassName="my-6"
           label="Member's wallet"
-          placeholder="Member's wallet or domain name (e.g. domain.sol)"
+          placeholder="Member's wallet or domain name (e.g. domain.solana)"
           value={form.destinationAccount}
           type="text"
           onChange={handleDestinationAccountChange}
