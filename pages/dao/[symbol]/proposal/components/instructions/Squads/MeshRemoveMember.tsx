@@ -155,7 +155,7 @@ const MeshRemoveMember = ({
       type: InstructionInputType.INPUT,
       inputType: 'text',
       name: 'member',
-      placeholder: 'Member wallet or domain name (e.g. domain.sol)',
+      placeholder: 'Member wallet or domain name (e.g. domain.solana)',
       additionalComponent: isResolvingDomain ? (
         <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
           <RefreshIcon className="h-4 w-4 animate-spin text-primary-light" />

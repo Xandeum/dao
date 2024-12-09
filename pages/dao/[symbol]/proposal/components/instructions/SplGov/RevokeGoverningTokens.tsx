@@ -255,7 +255,7 @@ const RevokeGoverningTokens: FC<{
           label="Member Public Key"
           value={form.memberKey}
           type="text"
-          placeholder="Member wallet or domain name (e.g. domain.sol)"
+          placeholder="Member wallet or domain name (e.g. domain.solana)"
           onChange={(e) => {
             const value = e.target.value
             setForm((p) => ({ ...p, memberKey: value }))

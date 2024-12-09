@@ -385,7 +385,7 @@ export default function InviteMembersForm({
           <Input
             type="text"
             name="memberAddresses"
-            placeholder="e.g. CWvWQWt5mTv7Zx... or domain.sol"
+            placeholder="e.g. CWvWQWt5mTv7Zx... or domain.solana"
             data-testid="dao-member-list-input"
             disabled={lacksMintAuthority}
             ref={inputElement}
