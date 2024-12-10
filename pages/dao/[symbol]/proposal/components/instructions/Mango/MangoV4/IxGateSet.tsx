@@ -694,7 +694,6 @@ const IxGateSet = ({
           formErrors={formErrors}
         ></InstructionForm>
       )}
-      asdasd
       <ForwarderProgram {...forwarderProgramHelpers}></ForwarderProgram>
     </>
   )
