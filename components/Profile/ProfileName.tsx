@@ -16,14 +16,6 @@ export const ProfileName: FC<Props> = ({ publicKey, height = "13",
                                          dark = false,
                                          style, }) => {
   const { profile, loading } = useProfile(publicKey)
-  const { connection } = useConnection()
-  const [domains, setDomains] = useState<any[]>([])
-  useEffect(() => {
-    if (publicKey) {
-      fetchDomainsByPubkey(connection, publicKey).then(setDomains)
-    }
-  }, [publicKey, connection])
-
 
   if (!publicKey) return <></>;
   return loading ? (
@@ -44,7 +36,7 @@ export const ProfileName: FC<Props> = ({ publicKey, height = "13",
       </div>
   ) : (
       <div style={{ display: "flex", gap: "5px", ...style }}>
-        {domains.length > 0 ? domains[0].domainName : profile?.name?.value || <ShortAddress address={publicKey} />}
+        {profile?.name?.value || <ShortAddress address={publicKey} />}
       </div>
   );
 }

@@ -12,6 +12,7 @@ import { Connection, ParsedAccountData, PublicKey } from '@solana/web3.js'
 interface Domain {
   domainName: string | undefined
   domainAddress: string
+  domainOwner: string
   type: 'sns' | 'alldomains'
 }
 
@@ -61,8 +62,6 @@ export const resolveDomain = async (
         }
       }
 
-      console.log('Pubkey:', pubkey.toBase58())
-
       // Retrieve the domain's registry information
       const { registry } = await NameRegistryState.retrieve(connection, pubkey)
 
@@ -87,15 +86,13 @@ export const fetchDomainsByPubkey = async (
   const sns_domains = await getAllDomains(connection, pubkey)
   const tld_domains = await parser.getParsedAllUserDomains(pubkey)
   const results: Domain[] = []
-
-  console.log('SNS domains:', sns_domains)
-  console.log('TLD domains:', tld_domains)
-
+  
   if (tld_domains.length > 0) {
     for (let i = 0; i < tld_domains.length; i++) {
       results.push({
         domainAddress: tld_domains[i].domain,
         domainName: tld_domains[i].nameAccount.toBase58(),
+        domainOwner: pubkey.toBase58(),
         type: 'alldomains',
       })
     }
@@ -108,6 +105,7 @@ export const fetchDomainsByPubkey = async (
       results.push({
         domainAddress: sns_domains[i].toBase58(),
         domainName: reverse[i] + '.sol',
+        domainOwner: pubkey.toBase58(),
         type: 'sns',
       })
     }

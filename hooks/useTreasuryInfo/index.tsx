@@ -78,7 +78,7 @@ export default function useTreasuryInfo(
         const allDomains = domainResults.flat().map(domain => ({
           name: domain.domainName?.replace('.sol', ''),
           address: domain.domainAddress,
-          owner: accounts[0].pubkey.toBase58(),
+          owner: domain.domainOwner,
           type: domain.type
         }));
         
