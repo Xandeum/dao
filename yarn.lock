@@ -2780,10 +2780,10 @@
     node-gyp "^7.1.0"
     read-package-json-fast "^2.0.1"
 
-"@onsol/tldparser@0.6.6":
-  version "0.6.6"
-  resolved "https://registry.yarnpkg.com/@onsol/tldparser/-/tldparser-0.6.6.tgz#e88f38e9bfa6058d0eacf18ad606f463f3760597"
-  integrity sha512-ArVxgBV4+9j1U8ja3JRogzFpOsVpFITV3DwN3lcwpbBt00NpmMIcMTdiR6swkfQLthDE3dI19tKmQBuKrN4wyA==
+"@onsol/tldparser@0.6.7":
+  version "0.6.7"
+  resolved "https://registry.yarnpkg.com/@onsol/tldparser/-/tldparser-0.6.7.tgz#f949865b4d6d46e4c8cc22816c4cfab8a8270163"
+  integrity sha512-QwkRDLyC514pxeplCCXZ2kTiRcJSeUrpp+9o2XqLbePy/qzZGGG8I0UbXUKuWVD/bUL1zAm21+D+Eu30OKwcQg==
   dependencies:
     "@ethersproject/sha2" "^5.7.0"
     "@metaplex-foundation/beet-solana" "^0.4.0"
