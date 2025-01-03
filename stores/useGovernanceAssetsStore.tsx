@@ -7,7 +7,7 @@ import {
   TOKEN_PROGRAM_ID,
   ProgramAccount,
   GovernanceAccountType,
-} from '@solana/spl-governance'
+} from '@realms-today/spl-governance'
 import {
   LAMPORTS_PER_SOL,
   ParsedAccountData,
@@ -134,11 +134,15 @@ const useGovernanceAssetsStore = create<GovernanceAssetsStore>((set, _get) => ({
 
     const governancesArray = _get().governancesArray
     const accounts: AssetAccount[] = []
-    const nativeAddresses = await Promise.all([
-      ...governancesArray.map((x) =>
-        getNativeTreasuryAddress(realm.owner, x.pubkey)
-      ),
-    ])
+    const nativeAddresses = [
+      ...governancesArray.map((x) => {
+        const [signatoryRecordAddress] = PublicKey.findProgramAddressSync(
+          [Buffer.from('native-treasury'), x.pubkey.toBuffer()],
+          realm.owner
+        )
+        return signatoryRecordAddress
+      }),
+    ]
     const governancesWithNativeTreasuryAddress = governancesArray.map(
       (x, index) => ({
         ...x,
@@ -154,6 +158,7 @@ const useGovernanceAssetsStore = create<GovernanceAssetsStore>((set, _get) => ({
 
     const additionalMintAccounts =
       additionalPossibleMintAccounts[realm.account.name]
+
     if (additionalMintAccounts) {
       possibleMintAccountPks.push(...additionalMintAccounts)
     }
@@ -179,9 +184,7 @@ const useGovernanceAssetsStore = create<GovernanceAssetsStore>((set, _get) => ({
     accounts.push(...governedTokenAccounts)
     const stakeAccounts = await loadStakeAccounts(
       connection,
-      governedTokenAccounts.filter(
-        (x) => x.isSol
-      )
+      governedTokenAccounts.filter((x) => x.isSol)
     )
     accounts.push(...stakeAccounts)
 
@@ -815,7 +818,6 @@ const loadGovernedTokenAccounts = async (
 
   const tokenAccountsOwnedByGovernances = uniquePublicKey([
     ...governancesArray.map((x) => x.nativeTreasuryAddress),
-    ...governancesArray.map((g) => g.pubkey),
     ...auxiliaryTokenAccounts.map((x) => new PublicKey(x.owner)),
   ])
 
@@ -826,16 +828,20 @@ const loadGovernedTokenAccounts = async (
         getTokenAccountsInfo(connection, group)
       )
     )
-  ).flat()
+  )
+    .flat()
+    .filter((x) => !x.account.amount.isZero())
 
   const governedTokenAccounts = (
     await Promise.all(
       // Load infos in batch, cannot load 9999 accounts within one request
-      group(tokenAccountsInfo).map((group) =>
+      group(tokenAccountsInfo, 100).map((group) =>
         getTokenAssetAccounts(group, governancesArray, connection)
       )
     )
   ).flat()
+
+  console.log(tokenAccountsInfo, governedTokenAccounts)
 
   // Remove potential accounts duplicate
   return uniqueGovernedTokenAccounts(governedTokenAccounts)
@@ -919,11 +925,15 @@ const getAccountsForGovernances = async (
 ): Promise<
   (AccountTypeMint | AccountTypeProgram | AssetAccount | AccountTypeGeneric)[]
 > => {
-  const nativeAddresses = await Promise.all([
-    ...governancesArray.map((x) =>
-      getNativeTreasuryAddress(realm.owner, x.pubkey)
-    ),
-  ])
+  const nativeAddresses = [
+    ...governancesArray.map((x) => {
+      const [signatoryRecordAddress] = PublicKey.findProgramAddressSync(
+        [Buffer.from('native-treasury'), x.pubkey.toBuffer()],
+        realm.owner
+      )
+      return signatoryRecordAddress
+    }),
+  ]
   const governancesWithNativeTreasuryAddress = governancesArray.map(
     (x, index) => ({
       ...x,
