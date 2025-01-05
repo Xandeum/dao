@@ -51,6 +51,7 @@ import {
 import group from '@utils/group'
 import { getFilteredProgramAccounts } from '@utils/helpers'
 import { bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes'
+import { getMetadataAddress } from '@utils/metaplex'
 
 const additionalPossibleMintAccounts = {
   Mango: [
@@ -774,17 +775,27 @@ const loadMintGovernanceAccounts = async (
     const possibleMintAccount = possibleMintAccounts[index]
     const pk = possibleMintAccountPks[index]
     if (possibleMintAccount) {
+      const metadataAddress = getMetadataAddress(pk)
+      const metadataAccountInfo = await connection.current.getAccountInfo(metadataAddress)      
+      const metadataUpdateAuthority = metadataAccountInfo?.data ? 
+        new PublicKey(metadataAccountInfo.data.slice(1,33)) :
+        null
+
       const data = Buffer.from(possibleMintAccount.data)
       const parsedMintInfo = parseMintAccountData(data) as MintInfo
       const ownerGovernance = governances.find(
         (g) =>
           parsedMintInfo?.mintAuthority &&
-          g.pubkey.equals(parsedMintInfo.mintAuthority)
+          g.pubkey.equals(parsedMintInfo.mintAuthority) ||
+          metadataUpdateAuthority &&
+          g.pubkey.equals(metadataUpdateAuthority)
       )
       const solAccountPk = nativeAccountAddresses.find(
         (x) =>
           parsedMintInfo?.mintAuthority &&
-          x.equals(parsedMintInfo.mintAuthority)
+          x.equals(parsedMintInfo.mintAuthority) ||
+          metadataUpdateAuthority &&
+          x.equals(metadataUpdateAuthority)
       )
       if (ownerGovernance || solAccountPk) {
         mintGovernances.push(
