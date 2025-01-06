@@ -14,7 +14,7 @@ import {
   PublicKey,
   StakeProgram,
 } from '@solana/web3.js'
-import { AccountInfo, MintInfo, u64 } from '@solana/spl-token'
+import { MintInfo, u64 } from '@solana/spl-token'
 import {
   AUXILIARY_TOKEN_ACCOUNTS,
   DEFAULT_NATIVE_SOL_MINT,
@@ -286,7 +286,7 @@ export default useGovernanceAssetsStore
 
 const getTokenAccountObj = (
   governance: GovernanceProgramAccountWithNativeTreasuryAddress,
-  tokenAccount: TokenProgramAccount<AccountInfo>,
+  tokenAccount: TokenProgramAccount<TokenAccount>,
   mintAccounts: TokenProgramAccount<MintInfo>[]
 ): AccountTypeNFT | AccountTypeToken | null => {
   const isNftAccount =
@@ -298,7 +298,7 @@ const getTokenAccountObj = (
 
   if (isNftAccount && !isToken2022(tokenAccount.account)) {
     return new AccountTypeNFT(
-      tokenAccount as TokenProgramAccount<AccountInfo>,
+      tokenAccount as TokenProgramAccount<TokenAccount>,
       mint,
       governance
     )
@@ -310,7 +310,7 @@ const getTokenAccountObj = (
     mint.publicKey.toBase58() !== DEFAULT_NATIVE_SOL_MINT
   ) {
     return new AccountTypeToken(
-      tokenAccount as TokenProgramAccount<AccountInfo>,
+      tokenAccount as TokenProgramAccount<TokenAccount>,
       mint!,
       governance
     )
@@ -364,7 +364,7 @@ const uniquePublicKey = (array: PublicKey[]): PublicKey[] => {
 const getTokenAssetAccounts = async (
   tokenAccounts: {
     publicKey: PublicKey
-    account: AccountInfo
+    account: TokenAccount
   }[],
   governances: GovernanceProgramAccountWithNativeTreasuryAddress[],
   connection: ConnectionContext
@@ -426,7 +426,7 @@ const getTokenAssetAccounts = async (
 
       if (mint && !isToken2022(tokenAccount.account)) {
         const account = new AccountTypeAuxiliaryToken(
-          tokenAccount as TokenProgramAccount<AccountInfo>,
+          tokenAccount as TokenProgramAccount<TokenAccount>,
           mint
         )
 

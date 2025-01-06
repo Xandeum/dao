@@ -4,10 +4,9 @@ import queryClient from './queryClient'
 import asFindable from '@utils/queries/asFindable'
 import { useConnection } from '@solana/wallet-adapter-react'
 import useWalletOnePointOh from '@hooks/useWalletOnePointOh'
-import { AccountInfo, TOKEN_PROGRAM_ID } from '@solana/spl-token'
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { parseTokenAccountData } from '@utils/parseTokenAccountData'
-
-type TokenAccount = AccountInfo
+import { TokenAccount } from '@utils/tokens'
 
 type TokenProgramAccount<T> = {
   publicKey: PublicKey
@@ -24,7 +23,7 @@ async function getOwnedTokenAccounts(
 
   return result.value.map((r) => {
     const publicKey = r.pubkey
-    const data = Buffer.from(r.account.data)
+    const data = Buffer.from(r.account.data.toString())
     const account = parseTokenAccountData(publicKey, data)
     return { publicKey, account }
   })
@@ -41,7 +40,7 @@ async function tryGetTokenAccount(
       return undefined
     }
 
-    const data = Buffer.from(result!.data)
+    const data = Buffer.from(result!.data.toString())
     const account = parseTokenAccountData(publicKey, data)
     return {
       publicKey,
