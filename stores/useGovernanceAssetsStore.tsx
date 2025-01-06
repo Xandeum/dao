@@ -28,7 +28,6 @@ import {
   getMultipleAccountInfoChunked,
   MintAccount,
   parseMintAccountData,
-  Token2022Account,
   TokenAccount,
   TokenProgramAccount,
 } from '@utils/tokens'
@@ -49,7 +48,6 @@ import {
   AccountTypeStake,
   StakeState,
   isToken2022,
-  AccountTypeToken2022,
 } from '@utils/uiTypes/assets'
 import group from '@utils/group'
 import { getFilteredProgramAccounts } from '@utils/helpers'
@@ -199,8 +197,7 @@ const useGovernanceAssetsStore = create<GovernanceAssetsStore>((set, _get) => ({
           (x) =>
             x.type === AccountType.TOKEN ||
             x.type === AccountType.NFT ||
-            x.type === AccountType.SOL ||
-            x.type === AccountType.TOKEN2022
+            x.type === AccountType.SOL
         )
         .filter(filterOutHiddenAccounts)
       s.assetAccounts = accounts.filter(filterOutHiddenAccounts)
@@ -276,8 +273,7 @@ const useGovernanceAssetsStore = create<GovernanceAssetsStore>((set, _get) => ({
           (x) =>
             x.type === AccountType.TOKEN ||
             x.type === AccountType.NFT ||
-            x.type === AccountType.SOL ||
-            x.type === AccountType.TOKEN2022
+            x.type === AccountType.SOL
         )
         .filter(filterOutHiddenAccounts)
       s.assetAccounts = [...previousAccounts, ...accounts].filter(
@@ -290,7 +286,7 @@ export default useGovernanceAssetsStore
 
 const getTokenAccountObj = (
   governance: GovernanceProgramAccountWithNativeTreasuryAddress,
-  tokenAccount: TokenProgramAccount<AccountInfo | Token2022Account>,
+  tokenAccount: TokenProgramAccount<AccountInfo>,
   mintAccounts: TokenProgramAccount<MintInfo>[]
 ): AccountTypeNFT | AccountTypeToken | null => {
   const isNftAccount =
@@ -311,24 +307,10 @@ const getTokenAccountObj = (
   if (
     mint.account.supply &&
     mint.account.supply.cmpn(1) !== 0 &&
-    mint.publicKey.toBase58() !== DEFAULT_NATIVE_SOL_MINT &&
-    !isToken2022(tokenAccount.account)
+    mint.publicKey.toBase58() !== DEFAULT_NATIVE_SOL_MINT
   ) {
     return new AccountTypeToken(
       tokenAccount as TokenProgramAccount<AccountInfo>,
-      mint!,
-      governance
-    )
-  }
-
-  if (
-    mint.account.supply &&
-    mint.account.supply.cmpn(1) !== 0 &&
-    mint.publicKey.toBase58() !== DEFAULT_NATIVE_SOL_MINT &&
-    isToken2022(tokenAccount.account)
-  ) {
-    return new AccountTypeToken2022(
-      tokenAccount as TokenProgramAccount<Token2022Account>,
       mint!,
       governance
     )
@@ -382,7 +364,7 @@ const uniquePublicKey = (array: PublicKey[]): PublicKey[] => {
 const getTokenAssetAccounts = async (
   tokenAccounts: {
     publicKey: PublicKey
-    account: AccountInfo | Token2022Account
+    account: AccountInfo
   }[],
   governances: GovernanceProgramAccountWithNativeTreasuryAddress[],
   connection: ConnectionContext
@@ -629,7 +611,7 @@ const getTokenAccountsInfo = async (
   publicKeys: PublicKey[],
   programId: PublicKey,
   encoding = 'base64'
-): Promise<TokenProgramAccount<TokenAccount | Token2022Account>[]> => {
+): Promise<TokenProgramAccount<TokenAccount>[]> => {
   const { data: tokenAccountsInfoJson } = await axios.post<
     unknown,
     {
@@ -690,21 +672,26 @@ const getTokenAccountsInfo = async (
       result.value.forEach(({ account, pubkey }) => {
         const publicKey = new PublicKey(pubkey)
         const parsed = account.data.parsed.info
-        const tokenAccount: Token2022Account = {
-          extensions: parsed.extensions,
+        const tokenAccount: TokenAccount = {
+          address: new PublicKey(pubkey),
           mint: new PublicKey(parsed.mint),
           owner: new PublicKey(parsed.owner),
-          state: parsed.state,
           amount: new u64(parsed.tokenAmount.amount),
-          decimals: parsed.tokenAmount.decimals,
-          uiAmount: parsed.tokenAmount.uiAmount,
+          delegate: null,
+          delegatedAmount: new u64(0),
+          isInitialized: true,
+          isFrozen: false,
+          isNative: false,
+          rentExemptReserve: null,
+          closeAuthority: null,
+          extensions: parsed.extensions,
           isToken2022: true,
         }
         tokenAccountsInfo.push({ publicKey, account: tokenAccount })
       })
 
       return tokenAccountsInfo
-    }, [] as TokenProgramAccount<Token2022Account>[])
+    }, [] as TokenProgramAccount<TokenAccount>[])
   }
 }
 

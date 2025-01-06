@@ -10,7 +10,7 @@ const AccountsItems = () => {
     governedTokenAccountsWithoutNfts,
     auxiliaryTokenAccounts,
   } = useGovernanceAssets()
-  console.log(governedTokenAccountsWithoutNfts, '@#@!#@!#')
+
   const [sortedAccounts, setSortedAccounts] = useState<AssetAccount[]>([])
   const [isLoading, setIsLoading] = useState(true)
 

@@ -27,16 +27,7 @@ import { AssetAccount } from '@utils/uiTypes/assets'
 import { parseTokenAccountData } from './parseTokenAccountData'
 
 export type TokenAccount = AccountInfo
-export type Token2022Account = {
-  extensions: any[]
-  mint: PublicKey
-  owner: PublicKey
-  state: string
-  amount: u64
-  decimals: number
-  uiAmount: number
-  isToken2022: boolean
-}
+
 export type MintAccount = MintInfo
 
 export type TokenProgramAccount<T> = {

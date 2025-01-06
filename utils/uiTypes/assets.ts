@@ -2,11 +2,7 @@ import { BN } from '@coral-xyz/anchor'
 import { Governance, ProgramAccount } from '@solana/spl-governance'
 import { AccountInfo, MintInfo, u64 } from '@solana/spl-token'
 import { ParsedAccountData, PublicKey } from '@solana/web3.js'
-import {
-  TokenProgramAccount,
-  AccountInfoGen,
-  Token2022Account,
-} from '@utils/tokens'
+import { TokenProgramAccount, AccountInfoGen } from '@utils/tokens'
 
 interface AccountExtension {
   mint?: TokenProgramAccount<MintInfo> | undefined
@@ -14,7 +10,6 @@ interface AccountExtension {
   amount?: u64
   solAccount?: AccountInfoGen<Buffer | ParsedAccountData>
   token?: TokenProgramAccount<AccountInfo>
-  token2022?: TokenProgramAccount<Token2022Account>
   program?: {
     authority: PublicKey
   }
@@ -43,7 +38,6 @@ export enum AccountType {
   GENERIC,
   AUXILIARY_TOKEN,
   STAKE,
-  TOKEN2022,
 }
 
 export class AccountTypeToken implements AssetAccount {
@@ -62,30 +56,6 @@ export class AccountTypeToken implements AssetAccount {
     this.type = AccountType.TOKEN
     this.extensions = {
       token: tokenAccount,
-      mint: mint,
-      transferAddress: tokenAccount!.publicKey!,
-      amount: tokenAccount!.account.amount,
-    }
-    this.isToken = true
-  }
-}
-
-export class AccountTypeToken2022 implements AssetAccount {
-  governance: GovernanceProgramAccountWithNativeTreasuryAddress
-  type: AccountType
-  extensions: AccountExtension
-  pubkey: PublicKey
-  isToken: boolean
-  constructor(
-    tokenAccount: TokenProgramAccount<Token2022Account>,
-    mint: TokenProgramAccount<MintInfo>,
-    governance: GovernanceProgramAccountWithNativeTreasuryAddress
-  ) {
-    this.governance = governance
-    this.pubkey = tokenAccount.publicKey
-    this.type = AccountType.TOKEN2022
-    this.extensions = {
-      token2022: tokenAccount,
       mint: mint,
       transferAddress: tokenAccount!.publicKey!,
       amount: tokenAccount!.account.amount,
@@ -259,7 +229,7 @@ export interface StakeAccount {
 }
 
 export function isToken2022(
-  tokenAccount: Token2022Account | AccountInfo
-): tokenAccount is Token2022Account {
-  return (<Token2022Account>tokenAccount).isToken2022
+  tokenAccount: AccountInfo
+): tokenAccount is AccountInfo {
+  return !!tokenAccount.isToken2022
 }
