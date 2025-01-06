@@ -27,6 +27,16 @@ import { AssetAccount } from '@utils/uiTypes/assets'
 import { parseTokenAccountData } from './parseTokenAccountData'
 
 export type TokenAccount = AccountInfo
+export type Token2022Account = {
+  extensions: any[]
+  mint: PublicKey
+  owner: PublicKey
+  state: string
+  amount: u64
+  decimals: number
+  uiAmount: number
+  isToken2022: boolean
+}
 export type MintAccount = MintInfo
 
 export type TokenProgramAccount<T> = {
@@ -44,7 +54,7 @@ export async function getOwnedTokenAccounts(
 
   return result.value.map((r) => {
     const publicKey = r.pubkey
-    const data = Buffer.from(r.account.data)
+    const data = Buffer.from(r.account.data.toString())
     const account = parseTokenAccountData(publicKey, data)
     return { publicKey, account }
   })
@@ -70,7 +80,7 @@ export const getTokenAccountsByMint = async (
   })
   return results.map((r) => {
     const publicKey = r.pubkey
-    const data = Buffer.from(r.account.data)
+    const data = Buffer.from(r.account.data.toString())
     const account = parseTokenAccountData(publicKey, data)
     return { publicKey, account }
   })
@@ -83,7 +93,7 @@ export async function tryGetMint(
 ): Promise<TokenProgramAccount<MintAccount> | undefined> {
   try {
     const result = await connection.getAccountInfo(publicKey)
-    const data = Buffer.from(result!.data)
+    const data = Buffer.from(result!.data.toString())
     const account = parseMintAccountData(data)
     return {
       publicKey,
@@ -110,7 +120,7 @@ export async function tryGetTokenAccount(
       return undefined
     }
 
-    const data = Buffer.from(result!.data)
+    const data = Buffer.from(result!.data.toString())
     const account = parseTokenAccountData(publicKey, data)
     return {
       publicKey,

@@ -44,7 +44,11 @@ export function useTotalTreasuryPrice() {
             x.isSol
               ? x.extensions.solAccount!.lamports
               : x.isToken || x.type === AccountType.AUXILIARY_TOKEN
-              ? x.extensions.token!.account?.amount
+              ? x.extensions.token?.account
+                ? x.extensions.token?.account.amount
+                : x.extensions.token2022?.account
+                ? x.extensions.token2022.account.amount
+                : 0
               : 0
           )
         ).toNumber() *

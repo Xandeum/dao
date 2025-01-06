@@ -14,7 +14,7 @@ import {
   PublicKey,
   StakeProgram,
 } from '@solana/web3.js'
-import { AccountInfo, MintInfo } from '@solana/spl-token'
+import { AccountInfo, MintInfo, u64 } from '@solana/spl-token'
 import {
   AUXILIARY_TOKEN_ACCOUNTS,
   DEFAULT_NATIVE_SOL_MINT,
@@ -28,6 +28,7 @@ import {
   getMultipleAccountInfoChunked,
   MintAccount,
   parseMintAccountData,
+  Token2022Account,
   TokenAccount,
   TokenProgramAccount,
 } from '@utils/tokens'
@@ -47,10 +48,13 @@ import {
   GovernanceProgramAccountWithNativeTreasuryAddress,
   AccountTypeStake,
   StakeState,
+  isToken2022,
+  AccountTypeToken2022,
 } from '@utils/uiTypes/assets'
 import group from '@utils/group'
 import { getFilteredProgramAccounts } from '@utils/helpers'
 import { bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes'
+import { AccountLayout, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token-new'
 
 const additionalPossibleMintAccounts = {
   Mango: [
@@ -195,7 +199,8 @@ const useGovernanceAssetsStore = create<GovernanceAssetsStore>((set, _get) => ({
           (x) =>
             x.type === AccountType.TOKEN ||
             x.type === AccountType.NFT ||
-            x.type === AccountType.SOL
+            x.type === AccountType.SOL ||
+            x.type === AccountType.TOKEN2022
         )
         .filter(filterOutHiddenAccounts)
       s.assetAccounts = accounts.filter(filterOutHiddenAccounts)
@@ -271,7 +276,8 @@ const useGovernanceAssetsStore = create<GovernanceAssetsStore>((set, _get) => ({
           (x) =>
             x.type === AccountType.TOKEN ||
             x.type === AccountType.NFT ||
-            x.type === AccountType.SOL
+            x.type === AccountType.SOL ||
+            x.type === AccountType.TOKEN2022
         )
         .filter(filterOutHiddenAccounts)
       s.assetAccounts = [...previousAccounts, ...accounts].filter(
@@ -284,7 +290,7 @@ export default useGovernanceAssetsStore
 
 const getTokenAccountObj = (
   governance: GovernanceProgramAccountWithNativeTreasuryAddress,
-  tokenAccount: TokenProgramAccount<AccountInfo>,
+  tokenAccount: TokenProgramAccount<AccountInfo | Token2022Account>,
   mintAccounts: TokenProgramAccount<MintInfo>[]
 ): AccountTypeNFT | AccountTypeToken | null => {
   const isNftAccount =
@@ -294,16 +300,38 @@ const getTokenAccountObj = (
     x.publicKey.equals(tokenAccount.account.mint)
   )!
 
-  if (isNftAccount) {
-    return new AccountTypeNFT(tokenAccount, mint, governance)
+  if (isNftAccount && !isToken2022(tokenAccount.account)) {
+    return new AccountTypeNFT(
+      tokenAccount as TokenProgramAccount<AccountInfo>,
+      mint,
+      governance
+    )
   }
 
   if (
     mint.account.supply &&
     mint.account.supply.cmpn(1) !== 0 &&
-    mint.publicKey.toBase58() !== DEFAULT_NATIVE_SOL_MINT
+    mint.publicKey.toBase58() !== DEFAULT_NATIVE_SOL_MINT &&
+    !isToken2022(tokenAccount.account)
   ) {
-    return new AccountTypeToken(tokenAccount, mint!, governance)
+    return new AccountTypeToken(
+      tokenAccount as TokenProgramAccount<AccountInfo>,
+      mint!,
+      governance
+    )
+  }
+
+  if (
+    mint.account.supply &&
+    mint.account.supply.cmpn(1) !== 0 &&
+    mint.publicKey.toBase58() !== DEFAULT_NATIVE_SOL_MINT &&
+    isToken2022(tokenAccount.account)
+  ) {
+    return new AccountTypeToken2022(
+      tokenAccount as TokenProgramAccount<Token2022Account>,
+      mint!,
+      governance
+    )
   }
 
   return null
@@ -354,7 +382,7 @@ const uniquePublicKey = (array: PublicKey[]): PublicKey[] => {
 const getTokenAssetAccounts = async (
   tokenAccounts: {
     publicKey: PublicKey
-    account: AccountInfo
+    account: AccountInfo | Token2022Account
   }[],
   governances: GovernanceProgramAccountWithNativeTreasuryAddress[],
   connection: ConnectionContext
@@ -414,8 +442,11 @@ const getTokenAssetAccounts = async (
         (x) => x.publicKey.toBase58() === tokenAccount.account.mint.toBase58()
       )
 
-      if (mint) {
-        const account = new AccountTypeAuxiliaryToken(tokenAccount, mint)
+      if (mint && !isToken2022(tokenAccount.account)) {
+        const account = new AccountTypeAuxiliaryToken(
+          tokenAccount as TokenProgramAccount<AccountInfo>,
+          mint
+        )
 
         if (account) {
           accounts.push(account)
@@ -595,17 +626,17 @@ const getMintAccountsInfo = async (
 
 const getTokenAccountsInfo = async (
   { endpoint, current: { commitment } }: ConnectionContext,
-  publicKeys: PublicKey[]
-): Promise<TokenProgramAccount<TokenAccount>[]> => {
+  publicKeys: PublicKey[],
+  programId: PublicKey,
+  encoding = 'base64'
+): Promise<TokenProgramAccount<TokenAccount | Token2022Account>[]> => {
   const { data: tokenAccountsInfoJson } = await axios.post<
     unknown,
     {
       data: {
         result: {
           value: {
-            account: {
-              data: [string, 'base64']
-            }
+            account: any
             pubkey: string
           }[]
         }
@@ -619,10 +650,10 @@ const getTokenAccountsInfo = async (
       method: 'getTokenAccountsByOwner',
       params: [
         publicKey,
-        { programId: TOKEN_PROGRAM_ID.toBase58() },
+        { programId: programId.toBase58() },
         {
           commitment,
-          encoding: 'base64',
+          encoding: encoding,
         },
       ],
     }))
@@ -636,23 +667,45 @@ const getTokenAccountsInfo = async (
     )
   }
 
-  return tokenAccountsInfoJson.reduce((tokenAccountsInfo, { result }) => {
-    result.value.forEach(
-      ({
-        account: {
-          data: [encodedData],
-        },
-        pubkey,
-      }) => {
-        const publicKey = new PublicKey(pubkey)
-        const data = Buffer.from(encodedData, 'base64')
-        const account = parseTokenAccountData(publicKey, data)
-        tokenAccountsInfo.push({ publicKey, account })
-      }
-    )
+  if (programId.equals(TOKEN_PROGRAM_ID)) {
+    return tokenAccountsInfoJson.reduce((tokenAccountsInfo, { result }) => {
+      result.value.forEach(
+        ({
+          account: {
+            data: [encodedData],
+          },
+          pubkey,
+        }) => {
+          const publicKey = new PublicKey(pubkey)
+          const data = Buffer.from(encodedData, 'base64')
+          const account = parseTokenAccountData(publicKey, data)
+          tokenAccountsInfo.push({ publicKey, account })
+        }
+      )
 
-    return tokenAccountsInfo
-  }, [] as TokenProgramAccount<TokenAccount>[])
+      return tokenAccountsInfo
+    }, [] as TokenProgramAccount<TokenAccount>[])
+  } else {
+    return tokenAccountsInfoJson.reduce((tokenAccountsInfo, { result }) => {
+      result.value.forEach(({ account, pubkey }) => {
+        const publicKey = new PublicKey(pubkey)
+        const parsed = account.data.parsed.info
+        const tokenAccount: Token2022Account = {
+          extensions: parsed.extensions,
+          mint: new PublicKey(parsed.mint),
+          owner: new PublicKey(parsed.owner),
+          state: parsed.state,
+          amount: new u64(parsed.tokenAmount.amount),
+          decimals: parsed.tokenAmount.decimals,
+          uiAmount: parsed.tokenAmount.uiAmount,
+          isToken2022: true,
+        }
+        tokenAccountsInfo.push({ publicKey, account: tokenAccount })
+      })
+
+      return tokenAccountsInfo
+    }, [] as TokenProgramAccount<Token2022Account>[])
+  }
 }
 
 const getSolAccountsInfo = async (
@@ -719,7 +772,7 @@ const loadMintGovernanceAccounts = async (
     const possibleMintAccount = possibleMintAccounts[index]
     const pk = possibleMintAccountPks[index]
     if (possibleMintAccount) {
-      const data = Buffer.from(possibleMintAccount.data)
+      const data = Buffer.from(possibleMintAccount.data.toString())
       const parsedMintInfo = parseMintAccountData(data) as MintInfo
       const ownerGovernance = governances.find(
         (g) =>
@@ -767,23 +820,38 @@ const loadGovernedTokenAccounts = async (
     await Promise.all(
       // Load infos in batch, cannot load 9999 accounts within one request
       group(tokenAccountOwners, 100).map((group) =>
-        getTokenAccountsInfo(connection, group)
+        getTokenAccountsInfo(connection, group, TOKEN_PROGRAM_ID)
       )
     )
   )
     .flat()
     .filter((x) => !x.account.amount.isZero())
 
-  const governedTokenAccounts = (
+  const token2022AccountsInfo = (
     await Promise.all(
       // Load infos in batch, cannot load 9999 accounts within one request
-      group(tokenAccountsInfo, 100).map((group) =>
-        getTokenAssetAccounts(group, governancesArray, connection)
+      group(tokenAccountOwners, 100).map((group) =>
+        getTokenAccountsInfo(
+          connection,
+          group,
+          TOKEN_2022_PROGRAM_ID,
+          'jsonParsed'
+        )
       )
     )
   ).flat()
 
-  console.log(tokenAccountsInfo, governedTokenAccounts)
+  const governedTokenAccounts = (
+    await Promise.all(
+      // Load infos in batch, cannot load 9999 accounts within one request
+      group(
+        [...tokenAccountsInfo, ...token2022AccountsInfo],
+        100
+      ).map((group) =>
+        getTokenAssetAccounts(group, governancesArray, connection)
+      )
+    )
+  ).flat()
 
   // Remove potential accounts duplicate
   return uniqueGovernedTokenAccounts(governedTokenAccounts)
