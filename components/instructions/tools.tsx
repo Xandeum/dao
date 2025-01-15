@@ -519,6 +519,7 @@ export interface InstructionDescriptor {
 // Well known program instructions displayed on the instruction card
 export const INSTRUCTION_DESCRIPTORS = {
   ...SPL_TOKEN_INSTRUCTIONS,
+  ...TOKEN_2022_INST,
   ...BPF_UPGRADEABLE_LOADER_INSTRUCTIONS,
   ...RAYDIUM_INSTRUCTIONS,
   ...MARINADE_INSTRUCTIONS,
