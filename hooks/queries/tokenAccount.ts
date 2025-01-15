@@ -23,7 +23,7 @@ async function getOwnedTokenAccounts(
 
   return result.value.map((r) => {
     const publicKey = r.pubkey
-    const data = Buffer.from(r.account.data.toString())
+    const data = Buffer.from(r.account.data)
     const account = parseTokenAccountData(publicKey, data)
     return { publicKey, account }
   })
@@ -40,7 +40,7 @@ async function tryGetTokenAccount(
       return undefined
     }
 
-    const data = Buffer.from(result!.data.toString())
+    const data = Buffer.from(result!.data)
     const account = parseTokenAccountData(publicKey, data)
     return {
       publicKey,

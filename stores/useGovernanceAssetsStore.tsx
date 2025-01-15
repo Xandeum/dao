@@ -759,7 +759,7 @@ const loadMintGovernanceAccounts = async (
     const possibleMintAccount = possibleMintAccounts[index]
     const pk = possibleMintAccountPks[index]
     if (possibleMintAccount) {
-      const data = Buffer.from(possibleMintAccount.data.toString())
+      const data = Buffer.from(possibleMintAccount.data)
       const parsedMintInfo = parseMintAccountData(data) as MintInfo
       const ownerGovernance = governances.find(
         (g) =>

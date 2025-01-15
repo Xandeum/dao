@@ -153,7 +153,7 @@ export const useMembersQuery = () => {
             .filter((x) => x)
             .map((r) => {
               const publicKey = r!.owner
-              const data = Buffer.from(r!.data.toString())
+              const data = Buffer.from(r!.data)
               const account = parseTokenAccountData(r!.owner, data)
               return { publicKey, account }
             })
