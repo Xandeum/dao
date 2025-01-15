@@ -74,8 +74,6 @@ export const SPL_TOKEN_INSTRUCTIONS = {
           ? getMintDecimalAmountFromNatural(tokenMint.account, rawAmount)
           : rawAmount
 
-        console.log(tokenMint)
-
         return (
           <>
             {tokenMint ? (
