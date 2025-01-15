@@ -236,7 +236,7 @@ export const SPL_TOKEN_INSTRUCTIONS = {
               <div>
                 <div>
                   <span>Amount:</span>
-                  <span>{`${tokenAmount.toNumber().toLocaleString()} ${
+                  <span>{`${tokenAmount.toNumber()} ${
                     tokenMintDescriptor?.name ?? ''
                   }`}</span>
                 </div>
