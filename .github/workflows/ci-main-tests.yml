@@ -36,7 +36,7 @@ jobs:
 
       # Report all vulnerabilities GitHub security tab
       - name: Report on all vulnerabilities
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.6.0
         with:
           scan-type: 'fs'
           ignore-unfixed: true
@@ -46,7 +46,7 @@ jobs:
 
       # Fail the job on critical vulnerabiliies with fix available
       - name: Fail on critical vulnerabilities
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.6.0
         with:
           scan-type: 'fs'
           ignore-unfixed: true
@@ -75,7 +75,7 @@ jobs:
           cache: yarn
 
       - name: Cache dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: '**/node_modules'
           key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
