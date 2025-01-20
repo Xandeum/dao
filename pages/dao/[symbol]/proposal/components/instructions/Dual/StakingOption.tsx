@@ -65,14 +65,10 @@ const StakingOption = ({
   useEffect(() => {
     const getAssetAccountMetadata = async (
       mintAssetAccount: AssetAccount,
-      base: boolean
+      base: boolean,
     ) => {
-      const {
-        logo,
-        name,
-        symbol,
-        displayPrice,
-      } = await getTreasuryAccountItemInfoV2Async(mintAssetAccount)
+      const { logo, name, symbol, displayPrice } =
+        await getTreasuryAccountItemInfoV2Async(mintAssetAccount)
       if (base) {
         setBaseMetadata({
           logo,
@@ -102,7 +98,7 @@ const StakingOption = ({
     }
     handleSetInstructions(
       { governedAccount: governedAccount, getInstruction },
-      index
+      index,
     )
     if (
       form.baseTreasury &&
@@ -240,7 +236,7 @@ const StakingOption = ({
             (x) =>
               x.isSol &&
               form.baseTreasury?.governance &&
-              x.governance.pubkey.equals(form.baseTreasury.governance.pubkey)
+              x.governance.pubkey.equals(form.baseTreasury.governance.pubkey),
           )}
           onChange={(value) => {
             handleSetForm({ value, propertyName: 'payer' })
