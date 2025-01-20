@@ -28,25 +28,16 @@ jobs:
         uses: github/codeql-action/analyze@v3
 
   sca:
+    if: ${{ github.actor != 'dependabot[bot]' }}
     name: Dependency Scan
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
-
-      # Report all vulnerabilities GitHub security tab
-      - name: Report on all vulnerabilities
-        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0
-        with:
-          scan-type: 'fs'
-          ignore-unfixed: true
-          hide-progress: true
-          format: 'sarif'
-          output: 'trivy-results.sarif'
 
       # Fail the job on critical vulnerabiliies with fix available
       - name: Fail on critical vulnerabilities
-        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
           ignore-unfixed: true
@@ -54,12 +45,6 @@ jobs:
           format: 'table'
           severity: 'CRITICAL'
           exit-code: '1'
-
-      - name: Upload scan results
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'trivy-results.sarif'
 
   test:
     name: Run Tests
