@@ -407,6 +407,7 @@ export enum Instructions {
   SymmetryEditBasket,
   SymmetryDeposit,
   SymmetryWithdraw,
+  TokenWithdrawFees,
 }
 
 export interface ComponentInstructionData {

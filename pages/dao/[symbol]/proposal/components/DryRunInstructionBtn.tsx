@@ -31,7 +31,7 @@ const DryRunInstructionBtn = ({
     if (result) {
       const inspectUrl = await getExplorerInspectorUrl(
         connection,
-        result.transaction
+        result.transaction,
       )
       window.open(inspectUrl, '_blank')
     } else {
