@@ -799,6 +799,7 @@ const loadGovernedTokenAccounts = async (
       : []
 
   const tokenAccountOwners = uniquePublicKey([
+    ...governancesArray.map(x => x.pubkey),
     ...governancesArray.map((x) => x.nativeTreasuryAddress),
     ...auxiliaryTokenAccounts.map((x) => new PublicKey(x.owner)),
   ])
