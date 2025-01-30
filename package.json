@@ -267,9 +267,9 @@
   ],
   "lavamoat": {
     "allowScripts": {
-      "@irys/web-upload>arbundles>keccak": true,
-      "@irys/web-upload/client>arbundles>secp256k1": true,
       "@metaplex-foundation/js>@bundlr-network/client>arbundles>secp256k1": true,
+      "@irys/web-upload>@irys/bundles>keccak": true,
+      "@irys/web-upload>@irys/bundles>secp256k1": true,
       "$root$": false,
       "@carbon/icons-react": false,
       "@civic/solana-gateway-react>@civic/common-gateway-react>styled-components": false,
