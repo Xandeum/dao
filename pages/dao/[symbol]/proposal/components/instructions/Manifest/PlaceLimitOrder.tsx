@@ -32,13 +32,14 @@ import {
   getAssociatedTokenAddressSync,
 } from '@solana/spl-token-new'
 import { toNative } from '@blockworks-foundation/mango-v4'
-import { utils, uiWrapper } from '@cks-systems/manifest-sdk'
-import { createCancelOrderInstruction } from '@cks-systems/manifest-sdk/dist/types/src/ui_wrapper'
-const { getVaultAddress } = utils
-const { createSettleFundsInstruction } = uiWrapper
+import { getVaultAddress } from '@cks-systems/manifest-sdk/dist/cjs/utils'
+import {
+  createCancelOrderInstruction,
+  createSettleFundsInstruction,
+} from '@cks-systems/manifest-sdk/dist/cjs/ui_wrapper/instructions'
 
 const MANIFEST_PROGRAM_ID = new PublicKey(
-  'MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms'
+  'MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms',
 )
 
 interface PlaceLimitOrderForm {
@@ -122,10 +123,12 @@ const PlaceLimitOrder = ({
     ) {
       const orderId = Date.now()
       const isBid = form.side.value === 'Buy'
+      console.log(form.governedAccount.extensions)
       const owner = form.governedAccount.extensions.token!.account.owner
+
       const wrapper = await UiWrapper.fetchFirstUserWrapper(
         connection.current,
-        owner
+        owner,
       )
       const market = await Market.loadFromAddress({
         connection: connection.current,
@@ -143,22 +146,23 @@ const PlaceLimitOrder = ({
         const wsolAta = getAssociatedTokenAddressSync(
           WRAPPED_SOL_MINT,
           owner,
-          true
+          true,
         )
-        const createPayerAtaIx = createAssociatedTokenAccountIdempotentInstruction(
-          owner,
-          wsolAta,
-          owner,
-          WRAPPED_SOL_MINT
-        )
+        const createPayerAtaIx =
+          createAssociatedTokenAccountIdempotentInstruction(
+            owner,
+            wsolAta,
+            owner,
+            WRAPPED_SOL_MINT,
+          )
         const solTransferIx = SystemProgram.transfer({
           fromPubkey: owner,
           toPubkey: wsolAta,
           lamports: toNative(
             Number(
-              !isBid ? form.amount : Number(form.amount) * Number(form.price)
+              !isBid ? form.amount : Number(form.amount) * Number(form.price),
             ),
-            9
+            9,
           ).toNumber(),
         })
 
@@ -166,7 +170,7 @@ const PlaceLimitOrder = ({
         ixes.push(
           serializeInstructionToBase64(createPayerAtaIx),
           serializeInstructionToBase64(solTransferIx),
-          serializeInstructionToBase64(syncNative)
+          serializeInstructionToBase64(syncNative),
         )
       }
 
@@ -174,13 +178,13 @@ const PlaceLimitOrder = ({
         const setup = await UiWrapper.setupIxs(
           connection.current,
           owner,
-          wallet.publicKey
+          wallet.publicKey,
         )
         wrapperPk = setup.signers[0].publicKey
 
         prerequisiteInstructions.push(...setup.ixs)
         signers.push(
-          ...setup.signers.map((x) => Keypair.fromSecretKey(x.secretKey))
+          ...setup.signers.map((x) => Keypair.fromSecretKey(x.secretKey)),
         )
       }
       const placeIx = await UiWrapper['placeIx_'](
@@ -197,7 +201,7 @@ const PlaceLimitOrder = ({
           amount: Number(form.amount),
           price: Number(form.price),
           orderId: orderId,
-        }
+        },
       )
       ixes.push(...placeIx.ixs.map((x) => serializeInstructionToBase64(x)))
 
@@ -205,13 +209,13 @@ const PlaceLimitOrder = ({
         baseMint,
         owner,
         true,
-        TOKEN_PROGRAM_ID
+        TOKEN_PROGRAM_ID,
       )
       const traderTokenAccountQuote = getAssociatedTokenAddressSync(
         quoteMint,
         owner,
         true,
-        TOKEN_PROGRAM_ID
+        TOKEN_PROGRAM_ID,
       )
 
       const [baseAtaAccount, quoteAtaAccount] = await Promise.all([
@@ -230,7 +234,7 @@ const PlaceLimitOrder = ({
           traderTokenAccountQuote,
           owner,
           quoteMint,
-          TOKEN_PROGRAM_ID
+          TOKEN_PROGRAM_ID,
         )
         ixes.push({
           serializedInstruction: serializeInstructionToBase64(quoteAtaCreateIx),
@@ -243,7 +247,7 @@ const PlaceLimitOrder = ({
           traderTokenAccountBase,
           owner,
           baseMint,
-          TOKEN_PROGRAM_ID
+          TOKEN_PROGRAM_ID,
         )
         ixes.push({
           serializedInstruction: serializeInstructionToBase64(baseAtaCreateIx),
@@ -252,49 +256,78 @@ const PlaceLimitOrder = ({
       }
 
       const mint = isBid ? quoteMint : baseMint
-      const cancelOrderIx: TransactionInstruction = createCancelOrderInstruction(
-        {
-          wrapperState: wrapperPk,
-          owner: owner,
-          traderTokenAccount: getAssociatedTokenAddressSync(mint, owner, true),
-          market: market.address,
-          vault: getVaultAddress(market.address, mint),
-          mint: mint,
-          systemProgram: SYSTEM_PROGRAM_ID,
-          tokenProgram: TOKEN_PROGRAM_ID,
-          manifestProgram: MANIFEST_PROGRAM_ID,
-        },
-        {
-          params: { clientOrderId: orderId },
-        }
-      )
+      const cancelOrderIx: TransactionInstruction =
+        createCancelOrderInstruction(
+          {
+            wrapperState: wrapperPk,
+            owner: owner,
+            traderTokenAccount: getAssociatedTokenAddressSync(
+              mint,
+              owner,
+              true,
+            ),
+            market: market.address,
+            vault: getVaultAddress(market.address, mint),
+            mint: mint,
+            systemProgram: SYSTEM_PROGRAM_ID,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            manifestProgram: MANIFEST_PROGRAM_ID,
+          },
+          {
+            params: { clientOrderId: orderId },
+          },
+        )
+      console.log(cancelOrderIx)
       ixes.push({
-        serializedInstruction: serializeInstructionToBase64(cancelOrderIx),
+        serializedInstruction: serializeInstructionToBase64({
+          ...cancelOrderIx,
+          keys: cancelOrderIx.keys.map((x, idx) => {
+            if (idx === 1) {
+              return {
+                ...x,
+                isWritable: true,
+              }
+            }
+            return x
+          }),
+        }),
         holdUpTime: form.settlingHoldUp,
       })
 
-      const settleOrderIx: TransactionInstruction = createSettleFundsInstruction(
-        {
-          wrapperState: wrapperPk,
-          owner: owner,
-          market: market.address,
-          manifestProgram: MANIFEST_PROGRAM_ID,
-          traderTokenAccountBase: traderTokenAccountBase,
-          traderTokenAccountQuote: traderTokenAccountQuote,
-          vaultBase: getVaultAddress(market.address, baseMint),
-          vaultQuote: getVaultAddress(market.address, quoteMint),
-          mintBase: baseMint,
-          mintQuote: quoteMint,
-          tokenProgramBase: TOKEN_PROGRAM_ID,
-          tokenProgramQuote: TOKEN_PROGRAM_ID,
-          platformTokenAccount: traderTokenAccountQuote,
-        },
-        {
-          params: { feeMantissa: 10 ** 9 * 0.0001, platformFeePercent: 100 },
-        }
-      )
+      const settleOrderIx: TransactionInstruction =
+        createSettleFundsInstruction(
+          {
+            wrapperState: wrapperPk,
+            owner: owner,
+            market: market.address,
+            manifestProgram: MANIFEST_PROGRAM_ID,
+            traderTokenAccountBase: traderTokenAccountBase,
+            traderTokenAccountQuote: traderTokenAccountQuote,
+            vaultBase: getVaultAddress(market.address, baseMint),
+            vaultQuote: getVaultAddress(market.address, quoteMint),
+            mintBase: baseMint,
+            mintQuote: quoteMint,
+            tokenProgramBase: TOKEN_PROGRAM_ID,
+            tokenProgramQuote: TOKEN_PROGRAM_ID,
+            platformTokenAccount: traderTokenAccountQuote,
+          },
+          {
+            params: { feeMantissa: 10 ** 9 * 0.0001, platformFeePercent: 100 },
+          },
+        )
       ixes.push({
-        serializedInstruction: serializeInstructionToBase64(settleOrderIx),
+        serializedInstruction: serializeInstructionToBase64({
+          ...settleOrderIx,
+          keys: settleOrderIx.keys.map((x, idx) => {
+            if (idx === 1) {
+              return {
+                ...x,
+                isWritable: true,
+              }
+            }
+            return x
+          }),
+        }),
         holdUpTime: form.settlingHoldUp,
       })
 
@@ -302,12 +335,12 @@ const PlaceLimitOrder = ({
         const wsolAta = getAssociatedTokenAddressSync(
           WRAPPED_SOL_MINT,
           owner,
-          true
+          true,
         )
         const solTransferIx = createCloseAccountInstruction(
           wsolAta,
           owner,
-          owner
+          owner,
         )
         ixes.push({
           serializedInstruction: serializeInstructionToBase64(solTransferIx),
@@ -331,7 +364,7 @@ const PlaceLimitOrder = ({
   useEffect(() => {
     const getMarkets = async () => {
       const marketAccounts = await ManifestClient.getMarketProgramAccounts(
-        connection.current
+        connection.current,
       )
 
       const markets = marketAccounts
@@ -339,13 +372,13 @@ const PlaceLimitOrder = ({
           Market.loadFromBuffer({
             address: x.pubkey,
             buffer: x.account.data,
-          })
+          }),
         )
         .sort((a, b) => Number(b.quoteVolume()) - Number(a.quoteVolume()))
         .map((x) => ({
-          name: `${
-            tokenPriceService.getTokenInfo(x.baseMint().toBase58())?.name
-          }/${tokenPriceService.getTokenInfo(x.quoteMint().toBase58())?.name}`,
+          name: `${tokenPriceService.getTokenInfo(x.baseMint().toBase58())
+            ?.name}/${tokenPriceService.getTokenInfo(x.quoteMint().toBase58())
+            ?.name}`,
           value: x.address.toBase58(),
           quote: x.quoteMint().toBase58(),
           base: x.baseMint().toBase58(),
@@ -361,7 +394,7 @@ const PlaceLimitOrder = ({
   useEffect(() => {
     handleSetInstructions(
       { governedAccount: form.governedAccount?.governance, getInstruction },
-      index
+      index,
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps -- TODO please fix, it can cause difficult bugs. You might wanna check out https://bobbyhadz.com/blog/react-hooks-exhaustive-deps for info. -@asktree
   }, [form])
