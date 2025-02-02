@@ -95,7 +95,7 @@ const PlaceLimitOrder = ({
     amount: '0',
     price: '0',
     side: sideOptions[0],
-    settlingHoldUp: 5,
+    settlingHoldUp: 15,
   })
   const [formErrors, setFormErrors] = useState({})
   const { handleSetInstructions } = useContext(NewProposalContext)
@@ -123,7 +123,7 @@ const PlaceLimitOrder = ({
     ) {
       const orderId = Date.now()
       const isBid = form.side.value === 'Buy'
-      console.log(form.governedAccount.extensions)
+
       const owner = form.governedAccount.extensions.token!.account.owner
 
       const wrapper = await UiWrapper.fetchFirstUserWrapper(

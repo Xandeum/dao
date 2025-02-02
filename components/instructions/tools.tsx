@@ -38,6 +38,7 @@ import { JUPITER_REF } from './programs/jupiterRef'
 import { STAKE_SANCTUM_INSTRUCTIONS } from './programs/stakeSanctum'
 import { SYMMETRY_V2_INSTRUCTIONS } from './programs/symmetryV2'
 import { TOKEN_2022_INST } from './programs/token2022'
+import { MANIFEST_INSTRUCTIONS } from './programs/manifest'
 
 /**
  * Default governance program id instance
@@ -358,12 +359,15 @@ export const ACCOUNT_NAMES = {
   '9Waj7NNTzEhyHf1j1F36xgtnXaLoAxVBFhf6VxE9fgaf': 'Parcl DAO',
 
   // Xandeum DAO
-  '3tWGHdmFd5FPqiZbR9r57qLDTnkxLBLAKno71a72ySQk': 'Xandeum DAO Community Building',
-  '4DZTzekhXx9QpG3MLzp25LGsmDRCUqA1BsVU2KuxCYdF': 'Xandeum DAO Ecosystem Development',
-  'DdphfkqpTJiHRQP6c7qVjtjG8aMQMPhEHpYjrRDSGpsC': 'Xandeum DAO Staking Rewards',
-  'EYu8Zh4odXLkpquHZMT6fKyX35qa84u5WGxZJ1Wi6BCr': 'Xandeum DAO Community Building',
-  '2dUeHJ1nbfoEJ3Qm9eDLjTG3cqSiCpJUifhEZi1AaW1R': 'Xandeum DAO Community Building',
-  
+  '3tWGHdmFd5FPqiZbR9r57qLDTnkxLBLAKno71a72ySQk':
+    'Xandeum DAO Community Building',
+  '4DZTzekhXx9QpG3MLzp25LGsmDRCUqA1BsVU2KuxCYdF':
+    'Xandeum DAO Ecosystem Development',
+  DdphfkqpTJiHRQP6c7qVjtjG8aMQMPhEHpYjrRDSGpsC: 'Xandeum DAO Staking Rewards',
+  EYu8Zh4odXLkpquHZMT6fKyX35qa84u5WGxZJ1Wi6BCr:
+    'Xandeum DAO Community Building',
+  '2dUeHJ1nbfoEJ3Qm9eDLjTG3cqSiCpJUifhEZi1AaW1R':
+    'Xandeum DAO Community Building',
 }
 
 // TODO: Add this to on-chain metadata to Governance account
@@ -553,6 +557,7 @@ export const INSTRUCTION_DESCRIPTORS = {
   ...STAKE_SANCTUM_INSTRUCTIONS,
   ...JUPITER_REF,
   ...SYMMETRY_V2_INSTRUCTIONS,
+  ...MANIFEST_INSTRUCTIONS,
 }
 
 export async function getInstructionDescriptor(
