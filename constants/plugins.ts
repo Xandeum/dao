@@ -89,7 +89,7 @@ export const findPluginName = (programId: PublicKey | undefined): PluginName =>
 
 // Used when creating a new realm to choose which voterWeightAddin to use
 export const pluginNameToCanonicalProgramId = (
-  pluginName: PluginName
+  pluginName: PluginName,
 ): PublicKey | undefined => {
   const lastPk = (arr: string[]) => new PublicKey(arr[arr.length - 1])
 
@@ -106,6 +106,8 @@ export const pluginNameToCanonicalProgramId = (
       return lastPk(QV_PLUGINS_PKS)
     case 'pyth':
       return lastPk(PYTH_PLUGIN_PK)
+    case 'token_voter':
+      return lastPk(TOKEN_VOTER_PK)
     default:
       return undefined
   }

@@ -34,7 +34,6 @@
     "@blockworks-foundation/mango-v4-settings": "0.14.24",
     "@blockworks-foundation/mangolana": "0.0.18",
     "@bonfida/spl-name-service": "0.1.47",
-    "@bundlr-network/client": "0.7.15",
     "@carbon/icons-react": "11.7.0",
     "@civic/profile": "^0.5.0-beta.1",
     "@civic/solana-gateway-react": "^0.16.10",
@@ -55,6 +54,8 @@
     "@heroicons/react": "1.0.6",
     "@hookform/resolvers": "2.8.10",
     "@identity.com/sol-did-client": "3.3.0",
+    "@irys/web-upload": "0.0.14",
+    "@irys/web-upload-solana": "0.1.7",
     "@jup-ag/referral-sdk": "0.1.5",
     "@marinade.finance/marinade-ts-sdk": "2.0.9",
     "@mean-dao/payment-streaming": "4.0.3",
@@ -143,6 +144,7 @@
     "figlet": "1.5.2",
     "file-saver": "2.0.5",
     "fp-ts": "2.12.2",
+    "governance-idl-sdk": "0.0.4",
     "graphql": "16.5.0",
     "immer": "9.0.15",
     "io-ts": "2.2.18",
@@ -193,9 +195,9 @@
     "@types/js-cookie": "3.0.2",
     "@types/node": "14.14.25",
     "@types/react": "17.0.44",
-    "@typescript-eslint/eslint-plugin": "8.1.0",
-    "@typescript-eslint/parser": "8.1.0",
-    "eslint": "9.9.0",
+    "@typescript-eslint/eslint-plugin": "5.43.0",
+    "@typescript-eslint/parser": "5.43.0",
+    "eslint": "8.13.0",
     "eslint-config-prettier": "9.1.0",
     "eslint-plugin-import": "2.29.1",
     "eslint-plugin-prettier": "5.2.1",
@@ -209,7 +211,7 @@
     "next-router-mock": "0.6.7",
     "postcss": "8.4.12",
     "postcss-preset-env": "6.7.0",
-    "prettier": "2.2.1",
+    "prettier": "3.0.2",
     "tailwindcss": "3.0.23",
     "ts-jest": "29.0.3",
     "ts-loader": "9.3.1",
@@ -247,7 +249,6 @@
     "**/@solana/spl-token-registry/cross-fetch/node-fetch": "2.6.7",
     "**/@blockworks-foundation/mangolana/node-fetch": "npm:@blockworks-foundation/node-fetch@2.6.11",
     "@bonfida/spl-name-service": "0.1.47",
-    "@bundlr-network/client": "0.7.15",
     "@carbon/icons-react": "11.7.0",
     "@cardinal/namespaces-components": "2.5.5",
     "crypto-js": ">=4.1.1",
@@ -266,9 +267,10 @@
   ],
   "lavamoat": {
     "allowScripts": {
+      "@metaplex-foundation/js>@bundlr-network/client>arbundles>secp256k1": true,
+      "@irys/web-upload>@irys/bundles>keccak": true,
+      "@irys/web-upload>@irys/bundles>secp256k1": true,
       "$root$": false,
-      "@bundlr-network/client>arbundles>keccak": true,
-      "@bundlr-network/client>arbundles>secp256k1": true,
       "@carbon/icons-react": false,
       "@civic/solana-gateway-react>@civic/common-gateway-react>styled-components": false,
       "@lavamoat/preinstall-always-fail": false,
@@ -291,5 +293,6 @@
   "volta": {
     "node": "18.19.0",
     "yarn": "1.22.19"
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha1.ac34549e6aa8e7ead463a7407e1c7390f61a6610"
 }

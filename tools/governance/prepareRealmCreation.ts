@@ -9,6 +9,8 @@ import {
   GovernanceConfig,
   GoverningTokenConfigAccountArgs,
   GoverningTokenType,
+  MintMaxVoteWeightSource,
+  MintMaxVoteWeightSourceType,
   SetRealmAuthorityAction,
   TOKEN_PROGRAM_ID,
   VoteThresholdType,
@@ -40,10 +42,12 @@ import { createGovernanceThresholds } from './configs'
 import { Token } from '@solana/spl-token'
 import { fetchProgramVersion } from '@hooks/queries/useProgramVersionQuery'
 import { fetchMintInfoByPubkey } from '@hooks/queries/mintInfo'
+import { PluginName } from '@constants/plugins'
 
 export interface Web3Context {
   connection: Connection
-  wallet: WalletSigner
+  wallet: WalletSigner,
+  pluginList?: PluginName[]
 }
 interface RealmCreationV2 {
   _programVersion: 2
@@ -79,7 +83,7 @@ type RealmCreationV3 = {
 
 export type RealmCreation = RealmCreationV2 | RealmCreationV3
 
-export const DEFAULT_MINT_DECIMALS = 6;
+export const DEFAULT_MINT_DECIMALS = 6
 
 export async function prepareRealmCreation({
   connection,
@@ -106,6 +110,7 @@ export async function prepareRealmCreation({
 
   communityTokenConfig,
   skipRealmAuthority,
+  pluginList,
   ...params
 }: RealmCreation & Web3Context) {
   const realmInstructions: TransactionInstruction[] = []
@@ -126,7 +131,7 @@ export async function prepareRealmCreation({
   console.log(
     'Prepare realm - program and version',
     programIdAddress,
-    programVersion
+    programVersion,
   )
 
   const {
@@ -137,7 +142,7 @@ export async function prepareRealmCreation({
   } = createGovernanceThresholds(
     programVersion,
     communityYesVotePercentage,
-    params._programVersion === 3 ? params.councilYesVotePercentage : 'disabled'
+    params._programVersion === 3 ? params.councilYesVotePercentage : 'disabled',
   )
 
   const existingCommunityMint = existingCommunityMintPk
@@ -148,14 +153,24 @@ export async function prepareRealmCreation({
     ? (await fetchMintInfoByPubkey(connection, existingCouncilMintPk)).result
     : undefined
 
-  const communityMintDecimals = existingCommunityMint?.decimals || DEFAULT_MINT_DECIMALS
+  const communityMintDecimals =
+    existingCommunityMint?.decimals || DEFAULT_MINT_DECIMALS
 
-  const communityMaxVoteWeightSource = parseMintMaxVoteWeight(
-    useSupplyFactor,
-    communityMintDecimals,
-    communityMintSupplyFactor,
-    communityAbsoluteMaxVoteWeight
-  )
+  if (pluginList?.includes('token_voter') && !existingCommunityMint?.supply) {
+    throw new Error("Cannot load the community mint info, Try again.")
+  }
+
+  const communityMaxVoteWeightSource = pluginList?.includes("token_voter") ?
+    new MintMaxVoteWeightSource({
+      type: MintMaxVoteWeightSourceType.Absolute, 
+      value: existingCommunityMint!.supply
+    }) :
+    parseMintMaxVoteWeight(
+      useSupplyFactor,
+      communityMintDecimals,
+      communityMintSupplyFactor,
+      communityAbsoluteMaxVoteWeight,
+    )
 
   console.log('Prepare realm - community mint address', existingCommunityMintPk)
   console.log('Prepare realm - community mint account', existingCommunityMint)
@@ -169,7 +184,7 @@ export async function prepareRealmCreation({
 
   let communityMintPk = existingCommunityMintPk
 
-  if (!communityMintPk) {
+  if (!communityMintPk || pluginList?.includes('token_voter')) {
     // Create community mint
     communityMintPk = await withCreateMint(
       connection,
@@ -178,7 +193,7 @@ export async function prepareRealmCreation({
       walletPk,
       null,
       communityMintDecimals,
-      walletPk
+      walletPk,
     )
   }
 
@@ -194,7 +209,7 @@ export async function prepareRealmCreation({
       walletPk,
       null,
       0,
-      walletPk
+      walletPk,
     )
   } else {
     councilMintPk = existingCouncilMintPk
@@ -251,7 +266,7 @@ export async function prepareRealmCreation({
     typeof tokensToGovernThreshold !== 'undefined'
       ? getMintNaturalAmountFromDecimalAsBN(
           tokensToGovernThreshold,
-          communityMintDecimals
+          communityMintDecimals,
         )
       : DISABLED_VOTER_WEIGHT
 
@@ -289,7 +304,7 @@ export async function prepareRealmCreation({
           realmPk,
           teamWalletPk,
           councilMintPk,
-          walletPk
+          walletPk,
         )
       }
 
@@ -303,7 +318,7 @@ export async function prepareRealmCreation({
         teamWalletPk,
         walletPk,
         walletPk,
-        new BN(initialCouncilTokenAmount)
+        new BN(initialCouncilTokenAmount),
       )
       // TODO remove workaround once unnecessary signer bug in sdk is fixed
       // this is a workaround
@@ -312,7 +327,7 @@ export async function prepareRealmCreation({
       buggedIx.keys = buggedIx.keys.map((key) =>
         key.pubkey.equals(teamWalletPk) && !key.pubkey.equals(walletPk)
           ? { ...key, isSigner: false }
-          : key
+          : key,
       )
     }
 
@@ -322,7 +337,7 @@ export async function prepareRealmCreation({
         councilMembersInstructions,
         councilMintPk,
         teamWalletPk,
-        walletPk
+        walletPk,
       )
 
       // Mint 1 council token to each team member
@@ -331,7 +346,7 @@ export async function prepareRealmCreation({
         councilMintPk,
         ataPk,
         walletPk,
-        initialCouncilTokenAmount
+        initialCouncilTokenAmount,
       )
 
       if (teamWalletPk.equals(walletPk)) {
@@ -345,7 +360,7 @@ export async function prepareRealmCreation({
           walletPk,
           walletPk,
           walletPk,
-          new BN(initialCouncilTokenAmount)
+          new BN(initialCouncilTokenAmount),
         )
       }
     }
@@ -381,7 +396,7 @@ export async function prepareRealmCreation({
     config,
     PublicKey.default,
     walletPk,
-    walletPk
+    walletPk,
   )
 
   const nativeTreasuryAddress = await withCreateNativeTreasury(
@@ -389,7 +404,7 @@ export async function prepareRealmCreation({
     programIdPk,
     programVersion,
     mainGovernancePk,
-    walletPk
+    walletPk,
   )
   if (transferCommunityMintAuthority) {
     const ix = Token.createSetAuthorityInstruction(
@@ -398,7 +413,7 @@ export async function prepareRealmCreation({
       nativeTreasuryAddress,
       'MintTokens',
       walletPk,
-      []
+      [],
     )
     if (existingCommunityMint?.freezeAuthority) {
       const freezeMintAuthorityPassIx = Token.createSetAuthorityInstruction(
@@ -407,7 +422,7 @@ export async function prepareRealmCreation({
         nativeTreasuryAddress,
         'FreezeAccount',
         walletPk,
-        []
+        [],
       )
       realmInstructions.push(freezeMintAuthorityPassIx)
     }
@@ -425,7 +440,7 @@ export async function prepareRealmCreation({
       nativeTreasuryAddress,
       'MintTokens',
       walletPk,
-      []
+      [],
     )
     if (existingCouncilMint?.freezeAuthority) {
       const freezeMintAuthorityPassIx = Token.createSetAuthorityInstruction(
@@ -434,7 +449,7 @@ export async function prepareRealmCreation({
         nativeTreasuryAddress,
         'FreezeAccount',
         walletPk,
-        []
+        [],
       )
       realmInstructions.push(freezeMintAuthorityPassIx)
     }
@@ -450,7 +465,7 @@ export async function prepareRealmCreation({
       realmPk,
       walletPk,
       mainGovernancePk,
-      SetRealmAuthorityAction.SetChecked
+      SetRealmAuthorityAction.SetChecked,
     )
   }
 
