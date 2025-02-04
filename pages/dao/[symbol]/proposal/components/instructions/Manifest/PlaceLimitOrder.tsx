@@ -20,13 +20,11 @@ import { InstructionInputType } from '../inputInstructionType'
 import useWalletOnePointOh from '@hooks/useWalletOnePointOh'
 import { ManifestClient, Market, UiWrapper } from '@cks-systems/manifest-sdk'
 import useLegacyConnectionContext from '@hooks/useLegacyConnectionContext'
-import { useRealmProposalsQuery } from '@hooks/queries/proposal'
 import tokenPriceService from '@utils/services/tokenPrice'
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { WRAPPED_SOL_MINT } from '@metaplex-foundation/js'
 import {
   createAssociatedTokenAccountIdempotentInstruction,
-  createAssociatedTokenAccountInstruction,
   createCloseAccountInstruction,
   createSyncNativeInstruction,
   getAssociatedTokenAddressSync,
@@ -67,7 +65,7 @@ const PlaceLimitOrder = ({
 }) => {
   const wallet = useWalletOnePointOh()
   const connection = useLegacyConnectionContext()
-  const proposals = useRealmProposalsQuery().data
+
   const { assetAccounts } = useGovernanceAssets()
   const [availableMarkets, setAvailableMarkets] = useState<
     {
@@ -241,33 +239,36 @@ const PlaceLimitOrder = ({
         quoteAtaAccount && quoteAtaAccount?.lamports > 0
 
       if (!doesPlatformAtaExists) {
-        const platformAtaCreateIx = createAssociatedTokenAccountInstruction(
-          wallet.publicKey!,
-          platformAta,
-          FEE_WALLET,
-          quoteMint,
-          TOKEN_PROGRAM_ID,
-        )
+        const platformAtaCreateIx =
+          createAssociatedTokenAccountIdempotentInstruction(
+            wallet.publicKey!,
+            platformAta,
+            FEE_WALLET,
+            quoteMint,
+            TOKEN_PROGRAM_ID,
+          )
         prerequisiteInstructions.push(platformAtaCreateIx)
       }
       if (!doesTheQuoteAtaExisits) {
-        const quoteAtaCreateIx = createAssociatedTokenAccountInstruction(
-          wallet.publicKey,
-          traderTokenAccountQuote,
-          owner,
-          quoteMint,
-          TOKEN_PROGRAM_ID,
-        )
+        const quoteAtaCreateIx =
+          createAssociatedTokenAccountIdempotentInstruction(
+            wallet.publicKey,
+            traderTokenAccountQuote,
+            owner,
+            quoteMint,
+            TOKEN_PROGRAM_ID,
+          )
         prerequisiteInstructions.push(quoteAtaCreateIx)
       }
       if (!doesTheBaseAtaExisits) {
-        const baseAtaCreateIx = createAssociatedTokenAccountInstruction(
-          wallet.publicKey,
-          traderTokenAccountBase,
-          owner,
-          baseMint,
-          TOKEN_PROGRAM_ID,
-        )
+        const baseAtaCreateIx =
+          createAssociatedTokenAccountIdempotentInstruction(
+            wallet.publicKey,
+            traderTokenAccountBase,
+            owner,
+            baseMint,
+            TOKEN_PROGRAM_ID,
+          )
         prerequisiteInstructions.push(baseAtaCreateIx)
       }
 

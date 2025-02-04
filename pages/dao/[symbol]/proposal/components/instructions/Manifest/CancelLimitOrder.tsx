@@ -22,8 +22,12 @@ import { Market, UiWrapper } from '@cks-systems/manifest-sdk'
 import useLegacyConnectionContext from '@hooks/useLegacyConnectionContext'
 import { useRealmProposalsQuery } from '@hooks/queries/proposal'
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
-import { WRAPPED_SOL_MINT } from '@metaplex-foundation/js'
 import {
+  createAuctionHouseOperationHandler,
+  WRAPPED_SOL_MINT,
+} from '@metaplex-foundation/js'
+import {
+  createAssociatedTokenAccountIdempotentInstruction,
   createAssociatedTokenAccountInstruction,
   createCloseAccountInstruction,
   getAssociatedTokenAddressSync,
@@ -51,7 +55,7 @@ const CancelLimitOrder = ({
 }) => {
   const wallet = useWalletOnePointOh()
   const connection = useLegacyConnectionContext()
-  const proposals = useRealmProposalsQuery().data
+
   const { assetAccounts } = useGovernanceAssets()
   const [openOrders, setOpenOrders] = useState<UiOpenOrder[]>([])
   const [openOrdersList, setOpenOrdersList] = useState<
@@ -87,10 +91,15 @@ const CancelLimitOrder = ({
       form.governedAccount?.governance?.account &&
       wallet?.publicKey
     ) {
-      const orderId = Date.now()
-      const isBid = form.side.value === 'Buy'
+      const order = openOrders.find(
+        (x) => x.clientOrderId.toString() === form.openOrder?.value,
+      )
+      console.log(order, form.openOrder?.value, openOrders)
+      const isBid = order?.isBid
 
-      const owner = form.governedAccount.extensions.token!.account.owner
+      const owner = form.governedAccount.isSol
+        ? form.governedAccount.extensions.transferAddress!
+        : form.governedAccount.extensions.token!.account.owner!
 
       const wrapper = await UiWrapper.fetchFirstUserWrapper(
         connection.current,
@@ -98,15 +107,14 @@ const CancelLimitOrder = ({
       )
       const market = await Market.loadFromAddress({
         connection: connection.current,
-        address: new PublicKey(form.market!.value),
+        address: new PublicKey(order!.market),
       })
       const quoteMint = market.quoteMint()
       const baseMint = market.baseMint()
-      let wrapperPk = wrapper?.pubkey
+      const wrapperPk = wrapper!.pubkey
 
-      const needToCreateWSolAcc = !isBid
-        ? baseMint.equals(WRAPPED_SOL_MINT)
-        : quoteMint.equals(WRAPPED_SOL_MINT)
+      const needToCreateWSolAcc =
+        baseMint.equals(WRAPPED_SOL_MINT) || quoteMint.equals(WRAPPED_SOL_MINT)
 
       const traderTokenAccountBase = getAssociatedTokenAddressSync(
         baseMint,
@@ -132,26 +140,28 @@ const CancelLimitOrder = ({
         quoteAtaAccount && quoteAtaAccount?.lamports > 0
 
       if (!doesTheQuoteAtaExisits) {
-        const quoteAtaCreateIx = createAssociatedTokenAccountInstruction(
-          owner,
-          traderTokenAccountQuote,
-          owner,
-          quoteMint,
-          TOKEN_PROGRAM_ID,
-        )
+        const quoteAtaCreateIx =
+          createAssociatedTokenAccountIdempotentInstruction(
+            owner,
+            traderTokenAccountQuote,
+            owner,
+            quoteMint,
+            TOKEN_PROGRAM_ID,
+          )
         ixes.push({
           serializedInstruction: serializeInstructionToBase64(quoteAtaCreateIx),
           holdUpTime: 0,
         })
       }
       if (!doesTheBaseAtaExisits) {
-        const baseAtaCreateIx = createAssociatedTokenAccountInstruction(
-          owner,
-          traderTokenAccountBase,
-          owner,
-          baseMint,
-          TOKEN_PROGRAM_ID,
-        )
+        const baseAtaCreateIx =
+          createAssociatedTokenAccountIdempotentInstruction(
+            owner,
+            traderTokenAccountBase,
+            owner,
+            baseMint,
+            TOKEN_PROGRAM_ID,
+          )
         ixes.push({
           serializedInstruction: serializeInstructionToBase64(baseAtaCreateIx),
           holdUpTime: 0,
@@ -177,7 +187,7 @@ const CancelLimitOrder = ({
             manifestProgram: MANIFEST_PROGRAM_ID,
           },
           {
-            params: { clientOrderId: orderId },
+            params: { clientOrderId: order!.clientOrderId },
           },
         )
 
@@ -270,12 +280,16 @@ const CancelLimitOrder = ({
             ) || {}),
           })) as UiOpenOrder[]
       })
+
       setOpenOrders(openOrders)
       setOpenOrdersList(
         openOrders.map((x) => ({
           name: `${tokenPriceService.getTokenInfo(x.baseMint.toBase58())
             ?.name}/${tokenPriceService.getTokenInfo(x.quoteMint.toBase58())
-            ?.name} - amount: ${x.numBaseTokens.toString()} price: ${
+            ?.name} - ${
+            x.isBid ? 'Buy' : 'Sell'
+          } ${tokenPriceService.getTokenInfo(x.baseMint.toBase58())
+            ?.name} amount: ${x.numBaseTokens.toString()} price: ${
             x.tokenPrice
           }`,
           value: x.clientOrderId.toString(),
@@ -300,7 +314,7 @@ const CancelLimitOrder = ({
       .nullable()
       .required('Program governed account is required'),
   })
-  console.log(openOrders)
+
   const inputs: InstructionInput[] = [
     {
       label: 'Governance',
@@ -309,13 +323,13 @@ const CancelLimitOrder = ({
       type: InstructionInputType.GOVERNED_ACCOUNT,
       shouldBeGoverned: shouldBeGoverned as any,
       governance: governance,
-      options: assetAccounts,
+      options: assetAccounts.filter((x) => x.isSol),
       assetType: 'token',
     },
     {
-      label: 'Side',
+      label: 'Open Order',
       initialValue: form.openOrder,
-      name: 'side',
+      name: 'openOrder',
       type: InstructionInputType.SELECT,
       options: openOrdersList,
     },
