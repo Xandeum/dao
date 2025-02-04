@@ -138,8 +138,16 @@ export const MANIFEST_INSTRUCTIONS = {
               }`}
             </div>
             <div>Side: {side}</div>
-            <div>Quote Token: {quoteTokenInfo?.symbol}</div>
-            <div>Base Token: {baseTokenInfo?.symbol}</div>
+            <div>
+              Quote Token:{' '}
+              {quoteTokenInfo?.symbol ||
+                abbreviateAddress(marketData.quoteMint())}
+            </div>
+            <div>
+              Base Token:{' '}
+              {baseTokenInfo?.symbol ||
+                abbreviateAddress(marketData.baseMint())}
+            </div>
             <div>
               {side} {uiAmount} {mint?.symbol} for {price * uiAmount}{' '}
               {currency?.symbol} ({price} {currency?.symbol} each)
@@ -229,8 +237,15 @@ export const MANIFEST_INSTRUCTIONS = {
                 }`}
               </div>
               <div>Side: {side}</div>
-              <div>Quote Token: {quoteTokenInfo?.symbol}</div>
-              <div>Base Token: {baseTokenInfo?.symbol}</div>
+              <div>
+                Quote Token:{' '}
+                {quoteTokenInfo?.symbol ||
+                  abbreviateAddress(openOrder.quoteMint)}
+              </div>
+              <div>
+                Base Token:{' '}
+                {baseTokenInfo?.symbol || abbreviateAddress(openOrder.baseMint)}
+              </div>
               <div>clientOrderId: {params.clientOrderId.toString()}</div>
             </div>
           )
