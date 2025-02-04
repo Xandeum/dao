@@ -1,11 +1,5 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { useContext, useEffect, useState } from 'react'
-import {
-  Keypair,
-  PublicKey,
-  SystemProgram,
-  TransactionInstruction,
-} from '@solana/web3.js'
+import { Keypair, PublicKey, TransactionInstruction } from '@solana/web3.js'
 import * as yup from 'yup'
 import { isFormValid, validatePubkey } from '@utils/formValidation'
 import { UiInstruction } from '@utils/uiTypes/proposalCreationTypes'
@@ -20,15 +14,10 @@ import { InstructionInputType } from '../inputInstructionType'
 import useWalletOnePointOh from '@hooks/useWalletOnePointOh'
 import { Market, UiWrapper } from '@cks-systems/manifest-sdk'
 import useLegacyConnectionContext from '@hooks/useLegacyConnectionContext'
-import { useRealmProposalsQuery } from '@hooks/queries/proposal'
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
-import {
-  createAuctionHouseOperationHandler,
-  WRAPPED_SOL_MINT,
-} from '@metaplex-foundation/js'
+import { WRAPPED_SOL_MINT } from '@metaplex-foundation/js'
 import {
   createAssociatedTokenAccountIdempotentInstruction,
-  createAssociatedTokenAccountInstruction,
   createCloseAccountInstruction,
   getAssociatedTokenAddressSync,
 } from '@solana/spl-token-new'
@@ -94,7 +83,6 @@ const CancelLimitOrder = ({
       const order = openOrders.find(
         (x) => x.clientOrderId.toString() === form.openOrder?.value,
       )
-      console.log(order, form.openOrder?.value, openOrders)
       const isBid = order?.isBid
 
       const owner = form.governedAccount.isSol
