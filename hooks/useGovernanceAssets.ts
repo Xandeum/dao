@@ -604,6 +604,11 @@ export default function useGovernanceAssets() {
       packageId: PackageEnum.Manifest,
       isVisible: canUseAnyInstruction,
     },
+    [Instructions.CancelLimitOrder]: {
+      name: 'Cancel limit order',
+      packageId: PackageEnum.Manifest,
+      isVisible: canUseAnyInstruction,
+    },
     [Instructions.MeanCreateAccount]: {
       name: 'Payment Stream: New account',
       packageId: PackageEnum.MeanFinance,

@@ -196,7 +196,7 @@ export const createProposal = async (
           ...instruction.prerequisiteInstructionsSigners,
         )
       }
-      console.log(instruction.holdUpTime, '@#@#@#@#')
+
       await withInsertTransaction(
         insertInstructions,
         programId,

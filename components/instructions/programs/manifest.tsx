@@ -1,15 +1,45 @@
 import { toUiDecimals } from '@blockworks-foundation/mango-v4'
-import { Market, orderTypeBeet, UiWrapper } from '@cks-systems/manifest-sdk'
+import {
+  Market,
+  orderTypeBeet,
+  RestingOrder,
+  UiWrapper,
+  UiWrapperOpenOrder,
+} from '@cks-systems/manifest-sdk'
 import {
   PlaceOrderInstructionArgs,
+  WrapperCancelOrderParams,
   WrapperPlaceOrderParams,
 } from '@cks-systems/manifest-sdk/dist/types/src/ui_wrapper'
 import * as beet from '@metaplex-foundation/beet'
 import { AccountMetaData } from '@solana/spl-governance'
 import { Connection, PublicKey } from '@solana/web3.js'
 import tokenPriceService from '@utils/services/tokenPrice'
+import { UiOpenOrder } from '@utils/uiTypes/manifest'
 
-export const wrapperPlaceOrderParamsBeet =
+export type CancelOrderInstructionArgs = {
+  params: WrapperCancelOrderParams
+}
+
+export const wrapperCancelOrderParamsBeet =
+  new beet.BeetArgsStruct<WrapperCancelOrderParams>(
+    [['clientOrderId', beet.u64]],
+    'WrapperCancelOrderParams',
+  )
+
+export const CancelOrderStruct = new beet.BeetArgsStruct<
+  CancelOrderInstructionArgs & {
+    instructionDiscriminator: number
+  }
+>(
+  [
+    ['instructionDiscriminator', beet.u8],
+    ['params', wrapperCancelOrderParamsBeet],
+  ],
+  'CancelOrderInstructionArgs',
+)
+
+const wrapperPlaceOrderParamsBeet =
   new beet.BeetArgsStruct<WrapperPlaceOrderParams>(
     [
       ['clientOrderId', beet.u64],
@@ -83,8 +113,8 @@ export const MANIFEST_INSTRUCTIONS = {
           connection: connection,
           address: new PublicKey(market),
         })
-        const mint = params.isBid ? quoteTokenInfo : baseTokenInfo
-        const currency = params.isBid ? baseTokenInfo : quoteTokenInfo
+        const mint = baseTokenInfo
+        const currency = quoteTokenInfo
         const uiAmount = toUiDecimals(amount, mint!.decimals)
         const price =
           params.priceMantissa *
@@ -108,7 +138,7 @@ export const MANIFEST_INSTRUCTIONS = {
             <div>Base Token: {baseTokenInfo?.symbol}</div>
             <div>
               {side} {uiAmount} {mint?.symbol} for {price * uiAmount}{' '}
-              {currency?.symbol}
+              {currency?.symbol} ({price} {currency?.symbol} each)
             </div>
           </div>
         )
@@ -127,8 +157,77 @@ export const MANIFEST_INSTRUCTIONS = {
         { name: 'Token Program' },
         { name: 'Manifest Program' },
       ],
-      getDataUI: () => {
-        return <div></div>
+      getDataUI: async (
+        connection: Connection,
+        data: Uint8Array,
+        accounts: AccountMetaData[],
+      ) => {
+        const params = CancelOrderStruct.deserialize(Buffer.from(data))[0]
+          .params
+
+        const wrapperAcc = await UiWrapper.fetchFirstUserWrapper(
+          connection,
+          accounts[1].pubkey,
+        )
+        if (!wrapperAcc) {
+          return null
+        }
+        const wrapper = UiWrapper.loadFromBuffer({
+          address: wrapperAcc.pubkey,
+          buffer: wrapperAcc.account.data,
+        })
+
+        const allMarketPks = wrapper.activeMarkets()
+
+        const allMarketInfos =
+          await connection.getMultipleAccountsInfo(allMarketPks)
+        const allMarkets = allMarketPks.map((address, i) =>
+          Market.loadFromBuffer({ address, buffer: allMarketInfos[i]!.data }),
+        )
+
+        const openOrders = allMarkets.flatMap((m) => {
+          const openOrdersForMarket = wrapper.openOrdersForMarket(m.address)!
+
+          return m
+            .openOrders()
+            .filter((x) => x.trader.equals(accounts[1].pubkey))
+            .map((oo) => ({
+              ...oo,
+              baseMint: m.baseMint(),
+              quoteMint: m.quoteMint(),
+              market: m.address,
+              ...(openOrdersForMarket.find(
+                (ooForMarket) =>
+                  ooForMarket.orderSequenceNumber.toString() ===
+                  oo.sequenceNumber.toString(),
+              ) || {}),
+            })) as UiOpenOrder[]
+        })
+        const openOrder = openOrders.find(
+          (x) => x.clientOrderId.toString() === params.clientOrderId.toString(),
+        )
+        if (openOrder) {
+          const quoteTokenInfo = tokenPriceService.getTokenInfo(
+            openOrder.quoteMint.toBase58(),
+          )
+          const baseTokenInfo = tokenPriceService.getTokenInfo(
+            openOrder.baseMint.toBase58(),
+          )
+          const side = openOrder.isBid ? 'Buy' : 'Sell'
+          return (
+            <div>
+              <div>
+                Market name: {`${baseTokenInfo?.name}/${quoteTokenInfo?.name}`}
+              </div>
+              <div>Side: {side}</div>
+              <div>Quote Token: {quoteTokenInfo?.symbol}</div>
+              <div>Base Token: {baseTokenInfo?.symbol}</div>
+              <div>clientOrderId: {params.clientOrderId.toString()}</div>
+            </div>
+          )
+        } else {
+          return 'No order found'
+        }
       },
     },
     5: {
@@ -191,13 +290,12 @@ export const MANIFEST_INSTRUCTIONS = {
             {quoteTokenInfo && (
               <div>
                 {quoteTokenInfo?.symbol} to settle{' '}
-                {toSettle?.numBaseTokens || 0}
+                {toSettle?.numQuoteTokens || 0}
               </div>
             )}
             {baseTokenInfo && (
               <div>
-                {baseTokenInfo?.symbol} to settle{' '}
-                {toSettle?.numQuoteTokens || 0}
+                {baseTokenInfo?.symbol} to settle {toSettle?.numBaseTokens || 0}
               </div>
             )}
           </div>

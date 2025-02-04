@@ -7,11 +7,11 @@ import {
   TransactionInstruction,
 } from '@solana/web3.js'
 import * as yup from 'yup'
-import { isFormValid, validatePubkey } from '@utils/formValidation'
+import { isFormValid } from '@utils/formValidation'
 import { UiInstruction } from '@utils/uiTypes/proposalCreationTypes'
 import { NewProposalContext } from '../../../new'
 import useGovernanceAssets from '@hooks/useGovernanceAssets'
-import { Governance, SYSTEM_PROGRAM_ID } from '@solana/spl-governance'
+import { Governance } from '@solana/spl-governance'
 import { ProgramAccount } from '@solana/spl-governance'
 import { serializeInstructionToBase64 } from '@solana/spl-governance'
 import { AssetAccount } from '@utils/uiTypes/assets'
@@ -33,10 +33,9 @@ import {
 } from '@solana/spl-token-new'
 import { toNative } from '@blockworks-foundation/mango-v4'
 import { getVaultAddress } from '@cks-systems/manifest-sdk/dist/cjs/utils'
-import {
-  createCancelOrderInstruction,
-  createSettleFundsInstruction,
-} from '@cks-systems/manifest-sdk/dist/cjs/ui_wrapper/instructions'
+import { createSettleFundsInstruction } from '@cks-systems/manifest-sdk/dist/cjs/ui_wrapper/instructions'
+
+const FEE_WALLET = new PublicKey('4GbrVmMPYyWaHsfRw7ZRnKzb98McuPovGqr27zmpNbhh')
 
 const MANIFEST_PROGRAM_ID = new PublicKey(
   'MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms',
@@ -95,7 +94,7 @@ const PlaceLimitOrder = ({
     amount: '0',
     price: '0',
     side: sideOptions[0],
-    settlingHoldUp: 15,
+    settlingHoldUp: 20,
   })
   const [formErrors, setFormErrors] = useState({})
   const { handleSetInstructions } = useContext(NewProposalContext)
@@ -105,6 +104,13 @@ const PlaceLimitOrder = ({
     setFormErrors(validationErrors)
     return isValid
   }
+  const quoteInfo = form.market?.quote
+    ? tokenPriceService.getTokenInfo(form.market.quote)
+    : null
+  const baseInfo = form.market?.base
+    ? tokenPriceService.getTokenInfo(form.market.base)
+    : null
+
   async function getInstruction(): Promise<UiInstruction> {
     const isValid = await validateInstruction()
     const ixes: (
@@ -124,7 +130,9 @@ const PlaceLimitOrder = ({
       const orderId = Date.now()
       const isBid = form.side.value === 'Buy'
 
-      const owner = form.governedAccount.extensions.token!.account.owner
+      const owner = form.governedAccount.isSol
+        ? form.governedAccount.extensions.transferAddress!
+        : form.governedAccount.extensions.token!.account.owner
 
       const wrapper = await UiWrapper.fetchFirstUserWrapper(
         connection.current,
@@ -138,9 +146,8 @@ const PlaceLimitOrder = ({
       const baseMint = market.baseMint()
       let wrapperPk = wrapper?.pubkey
 
-      const needToCreateWSolAcc = !isBid
-        ? baseMint.equals(WRAPPED_SOL_MINT)
-        : quoteMint.equals(WRAPPED_SOL_MINT)
+      const needToCreateWSolAcc =
+        baseMint.equals(WRAPPED_SOL_MINT) || quoteMint.equals(WRAPPED_SOL_MINT)
 
       if (needToCreateWSolAcc) {
         const wsolAta = getAssociatedTokenAddressSync(
@@ -158,12 +165,7 @@ const PlaceLimitOrder = ({
         const solTransferIx = SystemProgram.transfer({
           fromPubkey: owner,
           toPubkey: wsolAta,
-          lamports: toNative(
-            Number(
-              !isBid ? form.amount : Number(form.amount) * Number(form.price),
-            ),
-            9,
-          ).toNumber(),
+          lamports: toNative(Number(form.amount), 9).toNumber(),
         })
 
         const syncNative = createSyncNativeInstruction(wsolAta)
@@ -217,82 +219,57 @@ const PlaceLimitOrder = ({
         true,
         TOKEN_PROGRAM_ID,
       )
+      const platformAta = getAssociatedTokenAddressSync(
+        quoteMint,
+        FEE_WALLET,
+        true,
+        TOKEN_PROGRAM_ID,
+      )
 
-      const [baseAtaAccount, quoteAtaAccount] = await Promise.all([
-        connection.current.getAccountInfo(traderTokenAccountBase),
-        connection.current.getAccountInfo(traderTokenAccountQuote),
-      ])
+      const [platformAtaAccount, baseAtaAccount, quoteAtaAccount] =
+        await Promise.all([
+          connection.current.getAccountInfo(platformAta),
+          connection.current.getAccountInfo(traderTokenAccountBase),
+          connection.current.getAccountInfo(traderTokenAccountQuote),
+        ])
 
+      const doesPlatformAtaExists =
+        platformAtaAccount && platformAtaAccount?.lamports > 0
       const doesTheBaseAtaExisits =
         baseAtaAccount && baseAtaAccount?.lamports > 0
       const doesTheQuoteAtaExisits =
         quoteAtaAccount && quoteAtaAccount?.lamports > 0
 
+      if (!doesPlatformAtaExists) {
+        const platformAtaCreateIx = createAssociatedTokenAccountInstruction(
+          wallet.publicKey!,
+          platformAta,
+          FEE_WALLET,
+          quoteMint,
+          TOKEN_PROGRAM_ID,
+        )
+        prerequisiteInstructions.push(platformAtaCreateIx)
+      }
       if (!doesTheQuoteAtaExisits) {
         const quoteAtaCreateIx = createAssociatedTokenAccountInstruction(
-          owner,
+          wallet.publicKey,
           traderTokenAccountQuote,
           owner,
           quoteMint,
           TOKEN_PROGRAM_ID,
         )
-        ixes.push({
-          serializedInstruction: serializeInstructionToBase64(quoteAtaCreateIx),
-          holdUpTime: form.settlingHoldUp,
-        })
+        prerequisiteInstructions.push(quoteAtaCreateIx)
       }
       if (!doesTheBaseAtaExisits) {
         const baseAtaCreateIx = createAssociatedTokenAccountInstruction(
-          owner,
+          wallet.publicKey,
           traderTokenAccountBase,
           owner,
           baseMint,
           TOKEN_PROGRAM_ID,
         )
-        ixes.push({
-          serializedInstruction: serializeInstructionToBase64(baseAtaCreateIx),
-          holdUpTime: form.settlingHoldUp,
-        })
+        prerequisiteInstructions.push(baseAtaCreateIx)
       }
-
-      const mint = isBid ? quoteMint : baseMint
-      const cancelOrderIx: TransactionInstruction =
-        createCancelOrderInstruction(
-          {
-            wrapperState: wrapperPk,
-            owner: owner,
-            traderTokenAccount: getAssociatedTokenAddressSync(
-              mint,
-              owner,
-              true,
-            ),
-            market: market.address,
-            vault: getVaultAddress(market.address, mint),
-            mint: mint,
-            systemProgram: SYSTEM_PROGRAM_ID,
-            tokenProgram: TOKEN_PROGRAM_ID,
-            manifestProgram: MANIFEST_PROGRAM_ID,
-          },
-          {
-            params: { clientOrderId: orderId },
-          },
-        )
-      console.log(cancelOrderIx)
-      ixes.push({
-        serializedInstruction: serializeInstructionToBase64({
-          ...cancelOrderIx,
-          keys: cancelOrderIx.keys.map((x, idx) => {
-            if (idx === 1) {
-              return {
-                ...x,
-                isWritable: true,
-              }
-            }
-            return x
-          }),
-        }),
-        holdUpTime: form.settlingHoldUp,
-      })
 
       const settleOrderIx: TransactionInstruction =
         createSettleFundsInstruction(
@@ -309,7 +286,7 @@ const PlaceLimitOrder = ({
             mintQuote: quoteMint,
             tokenProgramBase: TOKEN_PROGRAM_ID,
             tokenProgramQuote: TOKEN_PROGRAM_ID,
-            platformTokenAccount: traderTokenAccountQuote,
+            platformTokenAccount: platformAta,
           },
           {
             params: { feeMantissa: 10 ** 9 * 0.0001, platformFeePercent: 100 },
@@ -433,19 +410,30 @@ const PlaceLimitOrder = ({
       assetType: 'token',
     },
     {
-      label: 'Amount',
+      label: 'Total Amount To Sell',
       initialValue: form.amount,
       name: 'amount',
       type: InstructionInputType.INPUT,
     },
     {
-      label: 'Price',
+      label: 'One Token Price',
       initialValue: form.price,
       name: 'price',
       type: InstructionInputType.INPUT,
+      additionalComponent:
+        tryGetNumber(form.amount) &&
+        tryGetNumber(form.price) &&
+        baseInfo &&
+        quoteInfo ? (
+          <div>
+            {form.side.name} {form.amount} {baseInfo?.symbol} for{' '}
+            {tryGetNumber(form.price) * tryGetNumber(form.amount)}{' '}
+            {quoteInfo?.symbol} ({form.price} {quoteInfo?.symbol} each)
+          </div>
+        ) : null,
     },
     {
-      label: 'Settling instruction holdup (minutes)',
+      label: 'Settling instruction holdup (minutes) - 20 minutes recommend',
       initialValue: form.settlingHoldUp,
       name: 'settlingHoldUp',
       type: InstructionInputType.INPUT,
@@ -468,3 +456,11 @@ const PlaceLimitOrder = ({
 }
 
 export default PlaceLimitOrder
+
+const tryGetNumber = (val: string) => {
+  try {
+    return Number(val)
+  } catch (e) {
+    return 0
+  }
+}
