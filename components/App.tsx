@@ -369,7 +369,7 @@ const Telemetry = () => {
   return (
     <PlausibleProvider
       domain="realms.today"
-      customDomain="https://pl.tantal.cloud"
+      customDomain="https://pl.cabana.exchange"
       trackLocalhost={true}
       selfHosted={true}
       enabled={true}
