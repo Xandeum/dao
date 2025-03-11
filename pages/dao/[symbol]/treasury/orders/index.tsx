@@ -7,15 +7,29 @@ import useWalletOnePointOh from '@hooks/useWalletOnePointOh'
 import Loading from '@components/Loading'
 import { ArrowsUpDownIcon } from '@heroicons/react-v2/20/solid'
 import Button from '@components/Button'
+import TokenBox from '@components/Orders/TokenBox'
+import tokenPriceService from '@utils/services/tokenPrice'
+import { USDC_MINT } from '@blockworks-foundation/mango-v4'
+import { TokenInfo } from '@utils/services/types'
+import Input from '@components/inputs/Input'
 
 export default function Orders() {
   const { governedTokenAccounts } = useGovernanceAssets()
   const [selectedSolWallet, setSelectedSolWallet] =
     useState<AssetAccount | null>(null)
+
   const wallet = useWalletOnePointOh()
   const connected = !!wallet?.connected
+  const { governedTokenAccountsWithoutNfts } = useGovernanceAssets()
+  const tokens = tokenPriceService._tokenList
+  const usdcToken = tokens.find((x) => x.address === USDC_MINT.toBase58())
 
+  const [sellToken, setSellToken] = useState<null | TokenInfo>(null)
+  const [sellAmount, setSellAmount] = useState('0')
+  const [buyToken, setBuyToken] = useState<null | TokenInfo>(null)
+  const [buyAmount, setBuyAmount] = useState('0')
   const loading = false
+
   const proposeSwap = () => null
   const handleSwitchTokens = () => null
   return (
@@ -38,7 +52,22 @@ export default function Orders() {
           <div className="shared-container relative py-6 md:px-2">
             <div className="bg-bkg-2">
               <div className="px-4">
-                <div>Input sell</div>
+                <div>Sell</div>
+                <div>
+                  <TokenBox
+                    img={sellToken?.logoURI}
+                    symbol={sellToken?.symbol}
+                  ></TokenBox>
+                </div>
+                <div>
+                  <Input
+                    className="w-full min-w-full mb-3"
+                    type="text"
+                    value={sellAmount}
+                    onChange={(e) => setSellAmount(e.target.value)}
+                    placeholder="Sell amount"
+                  />
+                </div>
                 <div className="flex items-center">
                   <div className="h-px w-full bg-bkg-4" />
                   <Button
@@ -49,7 +78,22 @@ export default function Orders() {
                   </Button>
                   <div className="h-px w-full bg-bkg-4" />
                 </div>
-                <div>Input buy</div>
+                <div>Buy</div>
+                <div>
+                  <TokenBox
+                    img={buyToken?.logoURI}
+                    symbol={buyToken?.symbol}
+                  ></TokenBox>
+                </div>
+                <div>
+                  <Input
+                    className="w-full min-w-full mb-3"
+                    type="text"
+                    value={buyAmount}
+                    onChange={(e) => setBuyAmount(e.target.value)}
+                    placeholder="Buy amount"
+                  />
+                </div>
                 {connected ? (
                   <Button
                     className={`mt-4 flex h-12 w-full items-center justify-center rounded-full bg-button font-bold text-button-text focus:outline-none disabled:cursor-not-allowed disabled:opacity-40 md:hover:bg-button-hover`}
