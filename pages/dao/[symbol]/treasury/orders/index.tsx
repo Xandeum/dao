@@ -1,7 +1,7 @@
 import PreviousRouteBtn from '@components/PreviousRouteBtn'
 import useGovernanceAssets from '@hooks/useGovernanceAssets'
 import { AssetAccount } from '@utils/uiTypes/assets'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import GovernedAccountSelect from '../../proposal/components/GovernedAccountSelect'
 import useWalletOnePointOh from '@hooks/useWalletOnePointOh'
 import Loading from '@components/Loading'
@@ -22,13 +22,21 @@ export default function Orders() {
   const connected = !!wallet?.connected
   const { governedTokenAccountsWithoutNfts } = useGovernanceAssets()
   const tokens = tokenPriceService._tokenList
-  const usdcToken = tokens.find((x) => x.address === USDC_MINT.toBase58())
+  const usdcToken =
+    tokens.find((x) => x.address === USDC_MINT.toBase58()) || null
 
   const [sellToken, setSellToken] = useState<null | TokenInfo>(null)
   const [sellAmount, setSellAmount] = useState('0')
+  const [price, setPrice] = useState('0')
   const [buyToken, setBuyToken] = useState<null | TokenInfo>(null)
   const [buyAmount, setBuyAmount] = useState('0')
   const loading = false
+
+  useEffect(() => {
+    if (!buyToken && usdcToken) {
+      setBuyToken(usdcToken)
+    }
+  }, [buyAmount, buyToken, usdcToken])
 
   const proposeSwap = () => null
   const handleSwitchTokens = () => null
@@ -61,11 +69,22 @@ export default function Orders() {
                 </div>
                 <div>
                   <Input
+                    label="Sell amount"
                     className="w-full min-w-full mb-3"
                     type="text"
                     value={sellAmount}
                     onChange={(e) => setSellAmount(e.target.value)}
                     placeholder="Sell amount"
+                  />
+                </div>
+                <div>
+                  <Input
+                    label="Price per token"
+                    className="w-full min-w-full mb-3"
+                    type="text"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    placeholder="Price"
                   />
                 </div>
                 <div className="flex items-center">
@@ -99,7 +118,7 @@ export default function Orders() {
                     className={`mt-4 flex h-12 w-full items-center justify-center rounded-full bg-button font-bold text-button-text focus:outline-none disabled:cursor-not-allowed disabled:opacity-40 md:hover:bg-button-hover`}
                     onClick={proposeSwap}
                   >
-                    {loading ? <Loading /> : <span>Swap</span>}
+                    {loading ? <Loading /> : <span>Place limit order</span>}
                   </Button>
                 ) : (
                   <Button
