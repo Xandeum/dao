@@ -12,6 +12,9 @@ import tokenPriceService from '@utils/services/tokenPrice'
 import { USDC_MINT } from '@blockworks-foundation/mango-v4'
 import { TokenInfo } from '@utils/services/types'
 import Input from '@components/inputs/Input'
+import Modal from '@components/Modal'
+import TokenSearchBox from '@components/Orders/TokenSearchBox'
+import { SideMode } from '@utils/orders'
 
 export default function Orders() {
   const { governedTokenAccounts } = useGovernanceAssets()
@@ -30,6 +33,9 @@ export default function Orders() {
   const [price, setPrice] = useState('0')
   const [buyToken, setBuyToken] = useState<null | TokenInfo>(null)
   const [buyAmount, setBuyAmount] = useState('0')
+  const [sideMode, setSideMode] = useState<SideMode>('Sell')
+  const [isTokenSearchOpen, setIsTokenSearchOpen] = useState(false)
+
   const loading = false
 
   useEffect(() => {
@@ -40,6 +46,11 @@ export default function Orders() {
 
   const proposeSwap = () => null
   const handleSwitchTokens = () => null
+  const openTokenSearchBox = (mode: SideMode) => {
+    setSideMode(mode)
+    setIsTokenSearchOpen(true)
+  }
+  console.log(isTokenSearchOpen)
   return (
     <div className="rounded-lg bg-bkg-2 p-6 min-h-full flex flex-col">
       <header className="space-y-6 border-b border-white/10 pb-4">
@@ -56,6 +67,18 @@ export default function Orders() {
         />
       </div>
       <div className="flex flex-col items-center justify-center">
+        {isTokenSearchOpen && (
+          <Modal
+            sizeClassName="sm:max-w-3xl"
+            onClose={() => setIsTokenSearchOpen(false)}
+            isOpen={isTokenSearchOpen}
+          >
+            <TokenSearchBox
+              wallet={selectedSolWallet?.extensions.transferAddress}
+              mode={sideMode}
+            ></TokenSearchBox>
+          </Modal>
+        )}
         <div className="w-full max-w-lg">
           <div className="shared-container relative py-6 md:px-2">
             <div className="bg-bkg-2">
@@ -63,6 +86,7 @@ export default function Orders() {
                 <div>Sell</div>
                 <div>
                   <TokenBox
+                    onClick={() => openTokenSearchBox('Sell')}
                     img={sellToken?.logoURI}
                     symbol={sellToken?.symbol}
                   ></TokenBox>

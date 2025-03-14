@@ -2,9 +2,20 @@ import { ArrowDown } from '@carbon/icons-react'
 import ImgWithLoader from '@components/ImgWithLoader'
 import TokenIcon from '@components/treasuryV2/icons/TokenIcon'
 
-export default function TokenBox({ img, symbol }) {
+export default function TokenBox({
+  img,
+  symbol,
+  onClick,
+}: {
+  img?: string
+  symbol?: string
+  onClick?: () => void
+}) {
   return (
-    <div className="flex items-center border border-bkg-4 p-3 my-3 rounded">
+    <div
+      onClick={onClick}
+      className="flex items-center border border-bkg-4 p-3 my-3 rounded"
+    >
       <>
         <div className="mr-3">
           {!img ? (
