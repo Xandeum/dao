@@ -14,7 +14,7 @@ import { TokenInfo } from '@utils/services/types'
 import Input from '@components/inputs/Input'
 import Modal from '@components/Modal'
 import TokenSearchBox from '@components/Orders/TokenSearchBox'
-import { SideMode } from '@utils/orders'
+import { getTokenLabels, SideMode } from '@utils/orders'
 
 export default function Orders() {
   const { governedTokenAccounts } = useGovernanceAssets()
@@ -23,18 +23,20 @@ export default function Orders() {
 
   const wallet = useWalletOnePointOh()
   const connected = !!wallet?.connected
-  const { governedTokenAccountsWithoutNfts } = useGovernanceAssets()
+
   const tokens = tokenPriceService._tokenList
   const usdcToken =
     tokens.find((x) => x.address === USDC_MINT.toBase58()) || null
 
-  const [sellToken, setSellToken] = useState<null | TokenInfo>(null)
+  const [sellToken, setSellToken] = useState<null | AssetAccount>(null)
   const [sellAmount, setSellAmount] = useState('0')
   const [price, setPrice] = useState('0')
   const [buyToken, setBuyToken] = useState<null | TokenInfo>(null)
   const [buyAmount, setBuyAmount] = useState('0')
   const [sideMode, setSideMode] = useState<SideMode>('Sell')
   const [isTokenSearchOpen, setIsTokenSearchOpen] = useState(false)
+
+  const { symbol, img, uiAmount } = getTokenLabels(sellToken)
 
   const loading = false
 
@@ -44,13 +46,22 @@ export default function Orders() {
     }
   }, [buyAmount, buyToken, usdcToken])
 
+  useEffect(() => {
+    if (
+      governedTokenAccounts.filter((x) => x.isSol)?.length &&
+      !selectedSolWallet
+    ) {
+      setSelectedSolWallet(governedTokenAccounts.filter((x) => x.isSol)[0])
+    }
+  }, [governedTokenAccounts, selectedSolWallet])
+
   const proposeSwap = () => null
   const handleSwitchTokens = () => null
   const openTokenSearchBox = (mode: SideMode) => {
     setSideMode(mode)
     setIsTokenSearchOpen(true)
   }
-  console.log(isTokenSearchOpen)
+
   return (
     <div className="rounded-lg bg-bkg-2 p-6 min-h-full flex flex-col">
       <header className="space-y-6 border-b border-white/10 pb-4">
@@ -74,6 +85,10 @@ export default function Orders() {
             isOpen={isTokenSearchOpen}
           >
             <TokenSearchBox
+              selectTokenAccount={(assetAccount) => {
+                setSellToken(assetAccount)
+                setIsTokenSearchOpen(false)
+              }}
               wallet={selectedSolWallet?.extensions.transferAddress}
               mode={sideMode}
             ></TokenSearchBox>
@@ -87,8 +102,9 @@ export default function Orders() {
                 <div>
                   <TokenBox
                     onClick={() => openTokenSearchBox('Sell')}
-                    img={sellToken?.logoURI}
-                    symbol={sellToken?.symbol}
+                    img={img}
+                    symbol={symbol}
+                    uiAmount={uiAmount}
                   ></TokenBox>
                 </div>
                 <div>

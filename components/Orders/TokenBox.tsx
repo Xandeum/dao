@@ -5,10 +5,12 @@ import TokenIcon from '@components/treasuryV2/icons/TokenIcon'
 export default function TokenBox({
   img,
   symbol,
+  uiAmount,
   onClick,
 }: {
   img?: string
   symbol?: string
+  uiAmount?: number
   onClick?: () => void
 }) {
   return (
@@ -25,7 +27,8 @@ export default function TokenBox({
           )}
         </div>
         <div className="text-xs">{symbol ? symbol : 'No token selected'}</div>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center">
+          <div className="pr-2">{uiAmount ? uiAmount?.toFixed(4) : ''}</div>
           <ArrowDown></ArrowDown>
         </div>
       </>
