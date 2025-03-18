@@ -48,3 +48,40 @@ export const tryGetNumber = (val: string) => {
 export const FEE_WALLET = new PublicKey(
   '4GbrVmMPYyWaHsfRw7ZRnKzb98McuPovGqr27zmpNbhh',
 )
+
+export const fetchLastPriceForMints = async (
+  mints: string[],
+): Promise<LastPrice[]> => {
+  const url = new URL(
+    `https://services.cabana-exchange.cloud/tnthieloh3ge/last-price`,
+  )
+  const requestConfig: RequestInit = {}
+  if (mints.length <= 20) {
+    const params = new URLSearchParams({
+      mints: mints.join(','),
+    })
+    url.search = params.toString()
+  } else {
+    requestConfig.method = 'POST'
+    requestConfig.headers = { 'Content-Type': 'application/json' }
+    requestConfig.body = JSON.stringify({ mints })
+  }
+
+  try {
+    const response = await fetch(url, requestConfig)
+    const data: LastPriceData = await response.json()
+    return data?.data?.length ? data.data : []
+  } catch (e) {
+    console.error('failed to fetch last price for mints', e)
+    return []
+  }
+}
+
+export type LastPrice = {
+  mint: string
+  price: number
+}
+
+type LastPriceData = {
+  data: LastPrice[]
+}

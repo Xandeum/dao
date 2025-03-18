@@ -5,17 +5,27 @@ import { useEffect, useState } from 'react'
 import GovernedAccountSelect from '../../proposal/components/GovernedAccountSelect'
 import useWalletOnePointOh from '@hooks/useWalletOnePointOh'
 import Loading from '@components/Loading'
-import { ArrowsUpDownIcon } from '@heroicons/react-v2/20/solid'
+import {
+  ArrowsUpDownIcon,
+  NoSymbolIcon,
+  QuestionMarkCircleIcon,
+  TrashIcon,
+} from '@heroicons/react-v2/20/solid'
 import Button from '@components/Button'
 import TokenBox from '@components/Orders/TokenBox'
 import tokenPriceService from '@utils/services/tokenPrice'
-import { toNative, USDC_MINT } from '@blockworks-foundation/mango-v4'
+import {
+  toNative,
+  toUiDecimals,
+  USDC_MINT,
+} from '@blockworks-foundation/mango-v4'
 import { TokenInfo } from '@utils/services/types'
 import Input from '@components/inputs/Input'
 import Modal from '@components/Modal'
 import TokenSearchBox from '@components/Orders/TokenSearchBox'
 import {
   FEE_WALLET,
+  fetchLastPriceForMints,
   getTokenLabels,
   SideMode,
   tryGetNumber,
@@ -35,16 +45,29 @@ import {
   getAssociatedTokenAddressSync,
 } from '@solana/spl-token-new'
 import {
+  getInstructionDataFromBase64,
   serializeInstructionToBase64,
   TOKEN_PROGRAM_ID,
 } from '@solana/spl-governance'
-import { UiInstruction } from '@utils/uiTypes/proposalCreationTypes'
+import useCreateProposal from '@hooks/useCreateProposal'
+import { InstructionDataWithHoldUpTime } from 'actions/createProposal'
+import { notify } from '@utils/notifications'
+import { useRouter } from 'next/router'
+import useQueryContext from '@hooks/useQueryContext'
+import { useVoteByCouncilToggle } from '@hooks/useVoteByCouncilToggle'
+import { useOpenOrders } from '@hooks/useOpenOrders'
+import { useQuery } from '@tanstack/react-query'
+import { useSortableData } from '@hooks/useSortableData'
 
 export default function Orders() {
+  const { fmtUrlWithCluster } = useQueryContext()
   const { governedTokenAccounts } = useGovernanceAssets()
+  const { handleCreateProposal } = useCreateProposal()
   const [selectedSolWallet, setSelectedSolWallet] =
     useState<AssetAccount | null>(null)
+  const [cancelId, setCancelId] = useState<number | null>(null)
   const connection = useLegacyConnectionContext()
+  const router = useRouter()
 
   const wallet = useWalletOnePointOh()
   const connected = !!wallet?.connected
@@ -52,6 +75,10 @@ export default function Orders() {
   const tokens = tokenPriceService._tokenList
   const usdcToken =
     tokens.find((x) => x.address === USDC_MINT.toBase58()) || null
+
+  const { openOrders, refetchOpenOrders, loadingOpenOrders } = useOpenOrders(
+    selectedSolWallet?.extensions.transferAddress,
+  )
 
   const [sellToken, setSellToken] = useState<null | AssetAccount>(null)
   const [sellAmount, setSellAmount] = useState('0')
@@ -94,6 +121,123 @@ export default function Orders() {
       setSelectedSolWallet(governedTokenAccounts.filter((x) => x.isSol)[0])
     }
   }, [governedTokenAccounts, selectedSolWallet])
+
+  const formattedTableData = async () => {
+    if (!openOrders?.length) return []
+    const data: any = []
+
+    // Collect all quote mints first
+    const quoteMints = openOrders.map((order) => order.quoteMint.toBase58())
+    console.log(openOrders)
+    // Fetch prices for all quote mints in one call
+    const quotePrices = await fetchLastPriceForMints(quoteMints)
+
+    for (let i = 0; i < openOrders.length; i++) {
+      const order = openOrders[i]
+      const {
+        baseMint,
+        quoteMint,
+        tokenPrice: price,
+        isBid,
+        market,
+        clientOrderId: orderId,
+      } = order
+
+      let size = order.numBaseAtoms
+      const side = isBid ? 'buy' : 'sell'
+      let baseSymbol = ''
+      let baseImageUrl = ''
+      let baseName = ''
+      let quoteSymbol = ''
+      let quoteImageUrl = ''
+      let quoteName = ''
+      let baseProgram = TOKEN_PROGRAM_ID.toBase58()
+      let quoteProgram = TOKEN_PROGRAM_ID.toBase58()
+
+      // const lastPriceQuote =
+      //   quoteMint.toBase58() === USDC_MINT
+      //     ? 1
+      //     : quotePrices.find((p) => p.mint === quoteMint.toBase58())?.price ||
+      //       null
+
+      const lastPriceQuote =
+        quotePrices.find((p) => p.mint === quoteMint.toBase58())?.price || null
+
+      if (
+        tokenPriceService._tokenList &&
+        tokenPriceService._tokenList?.length
+      ) {
+        const baseOrderMetaData = tokenPriceService._tokenList.find(
+          (meta) => meta.address === baseMint.toBase58(),
+        )
+        const quoteOrderMetaData = tokenPriceService._tokenList.find(
+          (meta) => meta.address === quoteMint.toBase58(),
+        )
+        if (baseOrderMetaData) {
+          baseSymbol = baseOrderMetaData?.symbol
+          baseImageUrl = baseOrderMetaData?.logoURI || ''
+          baseProgram = TOKEN_PROGRAM_ID.toBase58()
+          baseName = baseOrderMetaData?.name
+        }
+        if (quoteOrderMetaData) {
+          quoteSymbol = quoteOrderMetaData?.symbol
+          quoteImageUrl = quoteOrderMetaData?.logoURI || ''
+          quoteProgram = TOKEN_PROGRAM_ID.toBase58()
+          quoteName = quoteOrderMetaData?.name
+        }
+
+        size = toUiDecimals(
+          Number(size.toString()),
+          baseOrderMetaData?.decimals ?? 0,
+        )
+      }
+
+      const quoteValue = price * Number(size)
+      const usdValue = lastPriceQuote ? quoteValue * lastPriceQuote : null
+      const formattedOrder = {
+        marketName: `${baseSymbol}/${quoteSymbol}`,
+        baseImageUrl,
+        baseSymbol,
+        baseName,
+        quoteImageUrl,
+        quoteSymbol,
+        quoteName,
+        order,
+        orderId,
+        price,
+        side,
+        size,
+        baseMint,
+        market,
+        quoteMint,
+        isBid,
+        value: quoteValue,
+        baseProgram,
+        quoteProgram,
+        usdValue,
+      }
+      data.push(formattedOrder)
+    }
+    return data
+  }
+
+  const { data: formattedOrders, isLoading: loadingFormattedOrders } = useQuery(
+    ['formatted-orders', openOrders?.length],
+    () => formattedTableData(),
+    {
+      cacheTime: 1000 * 60 * 30,
+      staleTime: 1000 * 60 * 30,
+      retry: 3,
+      refetchOnWindowFocus: false,
+      enabled: !!openOrders?.length,
+    },
+  )
+
+  const {
+    items: tableData,
+    requestSort,
+    sortConfig,
+  } = useSortableData(formattedOrders || [])
 
   const proposeSwap = async () => {
     const ixes: (
@@ -257,17 +401,48 @@ export default function Orders() {
         prerequisiteInstructions.push(baseAtaCreateIx)
       }
     }
-    const obj: UiInstruction = {
-      serializedInstruction: '',
-      additionalSerializedInstructions: ixes,
-      prerequisiteInstructions: prerequisiteInstructions,
-      prerequisiteInstructionsSigners: signers,
-      isValid: true,
-      governance: selectedSolWallet?.governance,
-      customHoldUpTime: 0,
-      chunkBy: 1,
+
+    const proposalInstructions: InstructionDataWithHoldUpTime[] = []
+    for (const index in ixes) {
+      const ix = ixes[index]
+      if (Number(index) === 0) {
+        proposalInstructions.push({
+          data: getInstructionDataFromBase64(
+            typeof ix === 'string' ? ix : ix.serializedInstruction,
+          ),
+          holdUpTime: 0,
+          prerequisiteInstructions: prerequisiteInstructions,
+          prerequisiteInstructionsSigners: signers,
+          chunkBy: 1,
+        })
+      } else {
+        proposalInstructions.push({
+          data: getInstructionDataFromBase64(
+            typeof ix === 'string' ? ix : ix.serializedInstruction,
+          ),
+          holdUpTime: 0,
+          prerequisiteInstructions: [],
+          chunkBy: 1,
+        })
+      }
     }
-    console.log(obj)
+    try {
+      const proposalAddress = await handleCreateProposal({
+        title: 'swap',
+        description: '',
+        governance: selectedSolWallet!.governance,
+        instructionsData: proposalInstructions,
+        voteByCouncil: true,
+        isDraft: false,
+      })
+      const url = fmtUrlWithCluster(
+        `/dao/${symbol}/proposal/${proposalAddress}`,
+      )
+
+      router.push(url)
+    } catch (ex) {
+      notify({ type: 'error', message: `${ex}` })
+    }
   }
   const handleSwitchSides = () => null
   const openTokenSearchBox = (mode: SideMode) => {
@@ -327,7 +502,7 @@ export default function Orders() {
                 <div>
                   <Input
                     label="Sell amount"
-                    className="w-full min-w-full mb-3"
+                    className="w-full min-w-full mb-3 border-bkg-4"
                     type="text"
                     value={sellAmount}
                     onChange={(e) => setSellAmount(e.target.value)}
@@ -337,7 +512,7 @@ export default function Orders() {
                 <div>
                   <Input
                     label="Price per token"
-                    className="w-full min-w-full mb-3"
+                    className="w-full min-w-full mb-3 border-bkg-4"
                     type="text"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
@@ -363,7 +538,7 @@ export default function Orders() {
                 </div>
                 <div>
                   <Input
-                    className="w-full min-w-full mb-3"
+                    className="w-full min-w-full mb-3 border-bkg-4"
                     type="text"
                     value={buyAmount}
                     onChange={(e) => setBuyAmount(e.target.value)}
@@ -389,6 +564,155 @@ export default function Orders() {
             </div>
           </div>
         </div>
+      </div>
+      <div>
+        {openOrders && openOrders?.length ? (
+          <div>
+            {loadingFormattedOrders
+              ? [...Array(6)].map((x, i) => (
+                  <Loading className="flex flex-1 rounded-none" key={i}>
+                    <div
+                      className={`h-12 w-full ${
+                        i % 2 ? 'bg-th-bkg-2' : 'bg-th-bkg-3'
+                      }`}
+                    />
+                  </Loading>
+                ))
+              : tableData.map((data, i) => {
+                  const {
+                    baseImageUrl,
+                    baseSymbol,
+                    baseName,
+                    quoteImageUrl,
+                    quoteSymbol,
+                    quoteName,
+                    baseMint,
+                    quoteMint,
+                    orderId,
+                    price,
+                    side,
+                    size,
+                    market,
+                    isBid,
+                    baseProgram,
+                    quoteProgram,
+                    value,
+                    usdValue,
+                  } = data
+
+                  const baseTokenDetails = {
+                    mint: baseMint.toBase58(),
+                    name: baseName,
+                    image_url: baseImageUrl,
+                    symbol: baseSymbol,
+                  }
+
+                  const quoteTokenDetails = {
+                    mint: quoteMint.toBase58(),
+                    name: quoteName,
+                    image_url: quoteImageUrl,
+                    symbol: quoteSymbol,
+                  }
+
+                  return (
+                    <div
+                      className="default-transition -mx-3 flex items-center gap-3 rounded-xl px-3 hover:bg-th-bkg-3 focus:outline-none"
+                      key={`${orderId}${i}`}
+                    >
+                      <button className="flex w-full items-center justify-between py-3">
+                        <div>
+                          {loadingOpenOrders ? (
+                            <Loading>
+                              <div className="h-4 w-24 bg-th-bkg-2" />
+                            </Loading>
+                          ) : (
+                            <>
+                              <div className="mb-1 flex items-center space-x-2">
+                                {baseImageUrl ? (
+                                  <img
+                                    src={baseImageUrl}
+                                    height={16}
+                                    width={16}
+                                    alt={`${baseSymbol} token logo`}
+                                  />
+                                ) : (
+                                  <QuestionMarkCircleIcon className="size-4 text-th-fgd-4" />
+                                )}
+                                <div>
+                                  <p
+                                    className={`font-body text-xs xl:text-sm ${
+                                      side === 'buy'
+                                        ? 'text-th-up'
+                                        : 'text-th-down'
+                                    }`}
+                                  >
+                                    {side.toUpperCase()} {size.toString()}{' '}
+                                    {baseSymbol}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                {quoteImageUrl ? (
+                                  <img
+                                    src={quoteImageUrl}
+                                    height={16}
+                                    width={16}
+                                    alt={`${quoteSymbol} token logo`}
+                                  />
+                                ) : (
+                                  <QuestionMarkCircleIcon className="size-4 text-th-fgd-4" />
+                                )}
+                                <div>
+                                  <p
+                                    className={`font-body text-xs xl:text-sm ${
+                                      side !== 'buy'
+                                        ? 'text-th-up'
+                                        : 'text-th-down'
+                                    }`}
+                                  >
+                                    {side === 'buy' ? 'SELL' : 'BUY'} {value}{' '}
+                                    {quoteSymbol}
+                                  </p>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <p className="mb-1 h-4 text-xs text-th-fgd-2 xl:mb-1.5 xl:text-sm">
+                            {price} {quoteSymbol} per {baseSymbol}
+                          </p>
+                          {usdValue ? (
+                            <p className="h-4 text-xs xl:text-sm">
+                              ~$
+                              {usdValue}
+                            </p>
+                          ) : null}
+                        </div>
+                      </button>
+                      <Button
+                        className="bg-th-down !text-th-button-text md:hover:bg-th-down-dark"
+                        disabled={cancelId === orderId}
+                        onClick={() => null}
+                      >
+                        {cancelId === Number(orderId) ? (
+                          <Loading className="size-4" />
+                        ) : (
+                          <TrashIcon className="size-4" />
+                        )}
+                      </Button>
+                    </div>
+                  )
+                })}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center rounded-xl border border-th-bkg-4 p-6">
+            <div className="flex flex-col items-center">
+              <NoSymbolIcon className="mb-2 size-5 text-th-fgd-4" />
+              <p className="mb-1">No open limit orders...</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
