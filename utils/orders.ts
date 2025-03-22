@@ -85,3 +85,7 @@ export type LastPrice = {
 type LastPriceData = {
   data: LastPrice[]
 }
+
+export const MANIFEST_PROGRAM_ID = new PublicKey(
+  'MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms',
+)
