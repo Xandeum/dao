@@ -5,13 +5,6 @@ import { useCallback, useEffect, useState } from 'react'
 import GovernedAccountSelect from '../../proposal/components/GovernedAccountSelect'
 import useWalletOnePointOh from '@hooks/useWalletOnePointOh'
 import Loading from '@components/Loading'
-import {
-  ArrowsUpDownIcon,
-  CheckIcon,
-  NoSymbolIcon,
-  QuestionMarkCircleIcon,
-  TrashIcon,
-} from '@heroicons/react-v2/20/solid'
 import Button from '@components/Button'
 import TokenBox from '@components/Orders/TokenBox'
 import tokenPriceService from '@utils/services/tokenPrice'
@@ -62,13 +55,18 @@ import { useVoteByCouncilToggle } from '@hooks/useVoteByCouncilToggle'
 import { UiOpenOrder, useOpenOrders } from '@hooks/useOpenOrders'
 import { useQuery } from '@tanstack/react-query'
 import { useSortableData } from '@hooks/useSortableData'
-import {
-  createCancelOrderInstruction,
-  createSettleFundsInstruction,
-} from '@cks-systems/manifest-sdk/dist/types/src/ui_wrapper'
 import { getVaultAddress } from '@cks-systems/manifest-sdk/dist/cjs/utils'
 import { useUnsettledBalances } from '@hooks/useUnsettledBalances'
 import { abbreviateAddress } from '@utils/formatting'
+import {
+  CheckIcon,
+  QuestionMarkCircleIcon,
+  TrashIcon,
+} from '@heroicons/react/solid'
+import {
+  createCancelOrderInstruction,
+  createSettleFundsInstruction,
+} from '@cks-systems/manifest-sdk/dist/cjs/ui_wrapper/instructions'
 
 export default function Orders() {
   const { fmtUrlWithCluster } = useQueryContext()
@@ -1023,7 +1021,7 @@ export default function Orders() {
                     className="flex shrink-0 items-center justify-center rounded-full border border-bkg-4 bg-bkg-2"
                     onClick={() => handleSwitchSides()}
                   >
-                    <ArrowsUpDownIcon className="w-4 h-4 text-button-text" />
+                    {/* <ArrowsUpDownIcon className="w-4 h-4 text-button-text" /> */}
                   </Button>
                   <div className="h-px w-full bg-bkg-4" />
                 </div>
@@ -1147,7 +1145,6 @@ export default function Orders() {
         ) : (
           <div className="flex items-center justify-center rounded-xl border border-th-bkg-4 p-6">
             <div className="flex flex-col items-center">
-              <NoSymbolIcon className="mb-2 size-5 text-th-fgd-4" />
               <p className="mb-1">No unsettled orders...</p>
             </div>
           </div>
@@ -1296,7 +1293,6 @@ export default function Orders() {
         ) : (
           <div className="flex items-center justify-center rounded-xl border border-th-bkg-4 p-6">
             <div className="flex flex-col items-center">
-              <NoSymbolIcon className="mb-2 size-5 text-th-fgd-4" />
               <p className="mb-1">No open limit orders...</p>
             </div>
           </div>
