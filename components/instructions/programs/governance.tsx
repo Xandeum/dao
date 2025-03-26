@@ -134,7 +134,7 @@ export const GOVERNANCE_INSTRUCTIONS = {
       ) => {
         return (
           <>
-            <p>Withdraw full amount from DAO</p>
+            <p>Withdraw full amount</p>
           </>
         )
       },
