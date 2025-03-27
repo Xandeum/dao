@@ -17,13 +17,13 @@ export default function TokenItem({
 
   return (
     <div
-      className="p-2 border-b flex space-x-2 last-of-type:border-none border-bkg-4 "
+      className="p-3 border-b flex last-of-type:border-none border-bkg-4 cursor-pointer hover:bg-bkg-1 focus:bg-bkg-1"
       onClick={() => selectTokenAccount(assetAccount)}
     >
       {!img ? (
-        <TokenIcon className="h-6 w-6 stroke-white/50" />
+        <TokenIcon className="h-6 w-6 stroke-white/5 mr-3" />
       ) : (
-        <ImgWithLoader className="w-6 h-6" src={img}></ImgWithLoader>
+        <ImgWithLoader className="w-6 h-6 mr-3" src={img}></ImgWithLoader>
       )}
       <div>{symbol}</div>
       <div className="!ml-auto">{uiAmount.toFixed(4)}</div>

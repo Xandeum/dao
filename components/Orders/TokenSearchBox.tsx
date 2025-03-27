@@ -26,7 +26,7 @@ export default function TokenSearchBox({
   ]
 
   return (
-    <div className="flex items-center border border-bkg-4 p-3 my-3 rounded ">
+    <div className="flex flex-col items-center border border-bkg-4 my-3 rounded ">
       <div className="flex flex-col overflow-auto max-h-[500px] w-full">
         {availableTokenAccounts.map((acc) => (
           <TokenItem

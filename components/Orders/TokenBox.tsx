@@ -16,7 +16,7 @@ export default function TokenBox({
   return (
     <div
       onClick={onClick}
-      className="flex items-center border border-bkg-4 p-3 my-3 rounded"
+      className="flex items-center border border-fgd-3 p-3 my-3 cursor-pointer hover:border-primary-light focus:border-primary-light bg-bkg-1 rounded-md"
     >
       <>
         <div className="mr-3">

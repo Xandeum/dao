@@ -59,6 +59,7 @@ export const useUnsettledBalances = (publicKey?: PublicKey) => {
     {
       cacheTime: 1000 * 60 * 30,
       staleTime: 1000 * 60 * 30,
+      refetchInterval: 5000,
       retry: 3,
       refetchOnWindowFocus: false,
       enabled: !!publicKey && !!connection,

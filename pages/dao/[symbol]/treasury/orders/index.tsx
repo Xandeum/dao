@@ -280,6 +280,7 @@ export default function Orders() {
     {
       cacheTime: 1000 * 60 * 30,
       staleTime: 1000 * 60 * 30,
+      refetchInterval: 5000,
       retry: 3,
       refetchOnWindowFocus: false,
       enabled: !!openOrders?.length,
@@ -292,12 +293,7 @@ export default function Orders() {
     sortConfig,
   } = useSortableData(formattedOrders || [])
 
-  const settle = async (
-    unsettledMarket: PublicKey,
-    localReferrer: any,
-    p0: PublicKey,
-    p1: PublicKey,
-  ) => {
+  const settle = async (unsettledMarket: string) => {
     const ixes: (
       | string
       | {
@@ -316,7 +312,7 @@ export default function Orders() {
       )
       const market = await Market.loadFromAddress({
         connection: connection.current,
-        address: unsettledMarket,
+        address: new PublicKey(unsettledMarket),
       })
       const quoteMint = market.quoteMint()
       const baseMint = market.baseMint()
@@ -472,7 +468,7 @@ export default function Orders() {
     }
     try {
       const proposalAddress = await handleCreateProposal({
-        title: 'settle',
+        title: 'Settle limit orders',
         description: '',
         governance: selectedSolWallet!.governance,
         instructionsData: proposalInstructions,
@@ -480,7 +476,7 @@ export default function Orders() {
         isDraft: false,
       })
       const url = fmtUrlWithCluster(
-        `/dao/${symbol}/proposal/${proposalAddress}`,
+        `/dao/${router.query.symbol}/proposal/${proposalAddress}`,
       )
 
       router.push(url)
@@ -712,7 +708,7 @@ export default function Orders() {
     }
     try {
       const proposalAddress = await handleCreateProposal({
-        title: 'cancel',
+        title: 'Cancel limit order',
         description: '',
         governance: selectedSolWallet!.governance,
         instructionsData: proposalInstructions,
@@ -720,7 +716,7 @@ export default function Orders() {
         isDraft: false,
       })
       const url = fmtUrlWithCluster(
-        `/dao/${symbol}/proposal/${proposalAddress}`,
+        `/dao/${router.query.symbol}/proposal/${proposalAddress}`,
       )
 
       router.push(url)
@@ -729,11 +725,9 @@ export default function Orders() {
     }
   }
 
-  const {
-    items: tableUnsettledOrders,
-    requestUnslettedSort,
-    sortUnsettledConfig,
-  } = useSortableData(unselttedFormattedTableData())
+  const { items: tableUnsettledOrders } = useSortableData(
+    unselttedFormattedTableData(),
+  )
 
   const proposeSwap = async () => {
     const ixes: (
@@ -758,13 +752,32 @@ export default function Orders() {
         owner,
       )
 
-      const market = (
-        await Market.findByMints(
+      const markets = await Market.findByMints(
+        connection.current,
+        sellToken.extensions.mint!.publicKey!,
+        new PublicKey(buyToken!.address),
+      )
+      let market = markets.length ? markets[0] : null
+      if (!market) {
+        const marketIxs = await Market.setupIxs(
           connection.current,
           sellToken.extensions.mint!.publicKey!,
           new PublicKey(buyToken!.address),
+          wallet.publicKey,
         )
-      )[0]
+        market = {
+          address: marketIxs.signers[0].publicKey,
+          baseMint: () => baseMint,
+          quoteMint: () => quoteMint,
+          baseDecimals: () => sellToken.extensions.mint?.account.decimals,
+          quoteDecimals: () => buyToken?.decimals,
+        } as Market
+
+        prerequisiteInstructions.push(...marketIxs.ixs)
+        signers.push(
+          ...marketIxs.signers.map((x) => Keypair.fromSecretKey(x.secretKey)),
+        )
+      }
       const quoteMint = market!.quoteMint()
       const baseMint = market!.baseMint()
       let wrapperPk = wrapper?.pubkey
@@ -924,7 +937,7 @@ export default function Orders() {
     }
     try {
       const proposalAddress = await handleCreateProposal({
-        title: 'swap',
+        title: `Sell ${symbol} for USDC`,
         description: '',
         governance: selectedSolWallet!.governance,
         instructionsData: proposalInstructions,
@@ -932,7 +945,7 @@ export default function Orders() {
         isDraft: false,
       })
       const url = fmtUrlWithCluster(
-        `/dao/${symbol}/proposal/${proposalAddress}`,
+        `/dao/${router.query.symbol}/proposal/${proposalAddress}`,
       )
 
       router.push(url)
@@ -955,7 +968,7 @@ export default function Orders() {
       <header className="space-y-6 border-b border-white/10 pb-4">
         <PreviousRouteBtn />
       </header>
-      <div className="gap-x-4 mb-4">
+      <div className="gap-x-4 mb-6">
         <GovernedAccountSelect
           label={'Wallet'}
           governedAccounts={governedTokenAccounts.filter((x) => x.isSol)}
@@ -972,6 +985,7 @@ export default function Orders() {
             onClose={() => setIsTokenSearchOpen(false)}
             isOpen={isTokenSearchOpen}
           >
+            <div>Select token</div>
             <TokenSearchBox
               selectTokenAccount={(assetAccount) => {
                 setSellToken(assetAccount)
@@ -986,56 +1000,80 @@ export default function Orders() {
           <div className="shared-container relative py-6 md:px-2">
             <div className="bg-bkg-2">
               <div className="px-4">
-                <div>Sell</div>
-                <div>
-                  <TokenBox
-                    onClick={() => openTokenSearchBox('Sell')}
-                    img={img}
-                    symbol={symbol}
-                    uiAmount={uiAmount}
-                  ></TokenBox>
-                </div>
-                <div>
-                  <Input
-                    label="Sell amount"
-                    className="w-full min-w-full mb-3 border-bkg-4"
-                    type="text"
-                    value={sellAmount}
-                    onChange={(e) => setSellAmount(e.target.value)}
-                    placeholder="Sell amount"
-                  />
-                </div>
-                <div>
-                  <Input
-                    label="Price per token"
-                    className="w-full min-w-full mb-3 border-bkg-4"
-                    type="text"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    placeholder="Price"
-                  />
-                </div>
-                <div className="flex items-center">
+                <div className="text-xs">Sell</div>
+                <TokenBox
+                  onClick={() => openTokenSearchBox('Sell')}
+                  img={img}
+                  symbol={symbol}
+                  uiAmount={uiAmount}
+                ></TokenBox>
+                <Input
+                  labelAdditionalComponent={
+                    <div className="flex">
+                      <div
+                        onClick={() => {
+                          setSellAmount((uiAmount * 0.25).toString())
+                        }}
+                        className="text-xs mr-2 cursor-pointer hover:text-primary-light"
+                      >
+                        25%
+                      </div>
+                      <div
+                        onClick={() => {
+                          setSellAmount((uiAmount / 2).toString())
+                        }}
+                        className="text-xs mr-2 cursor-pointer hover:text-primary-light"
+                      >
+                        50%
+                      </div>
+                      <div
+                        onClick={() => {
+                          setSellAmount(uiAmount.toString())
+                        }}
+                        className="text-xs cursor-pointer hover:text-primary-light"
+                      >
+                        Max
+                      </div>
+                    </div>
+                  }
+                  label="Sell amount"
+                  className="w-full min-w-full mb-3 border-bkg-4"
+                  type="number"
+                  value={sellAmount}
+                  onChange={(e) => setSellAmount(e.target.value)}
+                  placeholder="Sell amount"
+                />
+                <Input
+                  label="Price per token"
+                  className="w-full min-w-full mb-3 border-bkg-4"
+                  type="number"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="Price"
+                />
+                <div className="flex items-center py-4">
                   <div className="h-px w-full bg-bkg-4" />
-                  <Button
+                  {/* <Button
                     className="flex shrink-0 items-center justify-center rounded-full border border-bkg-4 bg-bkg-2"
                     onClick={() => handleSwitchSides()}
                   >
-                    {/* <ArrowsUpDownIcon className="w-4 h-4 text-button-text" /> */}
-                  </Button>
+                 <ArrowsUpDownIcon className="w-4 h-4 text-button-text" />
+                  </Button> */}
                   <div className="h-px w-full bg-bkg-4" />
                 </div>
-                <div>Buy</div>
+                <div className="text-xs mb-3">Buy</div>
                 <div>
                   <TokenBox
                     img={buyToken?.logoURI}
                     symbol={buyToken?.symbol}
                   ></TokenBox>
                 </div>
+                <div className="text-xs mb-3">Amount</div>
                 <div>
                   <Input
                     className="w-full min-w-full mb-3 border-bkg-4"
-                    type="text"
+                    disabled={true}
+                    type="number"
                     value={buyAmount}
                     onChange={(e) => setBuyAmount(e.target.value)}
                     placeholder="Buy amount"
@@ -1064,11 +1102,11 @@ export default function Orders() {
       <div>
         {tableUnsettledOrders?.length ? (
           <div>
-            <p className="mb-4 text-xs">
-              Settle your filled orders to transfer the balance to your wallet.
-            </p>
-            <div className="space-y-3">
-              {tableData.map((data, index) => {
+            <div className="mt-6 mb-2">
+              Settle your filled orders to transfer the funds to DAO wallet
+            </div>
+            <div className="space-y-3 border border-bkg-4 p-6 mb-6">
+              {tableUnsettledOrders.map((data, index) => {
                 const {
                   marketName,
                   marketAddress,
@@ -1124,16 +1162,9 @@ export default function Orders() {
                       <div className="flex justify-end">
                         <Button
                           className="bg-th-up !text-th-button-text md:hover:bg-th-up-dark"
-                          onClick={() =>
-                            settle(
-                              market,
-                              '',
-                              new PublicKey(baseProgram),
-                              new PublicKey(quoteProgram),
-                            )
-                          }
+                          onClick={() => settle(marketAddress)}
                         >
-                          <CheckIcon className="size-4" />
+                          <CheckIcon className="w-4" />
                         </Button>
                       </div>
                     </div>
@@ -1143,16 +1174,17 @@ export default function Orders() {
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center rounded-xl border border-th-bkg-4 p-6">
+          <div className="flex items-center justify-center rounded-xl border border-bkg-4 p-6 my-6">
             <div className="flex flex-col items-center">
               <p className="mb-1">No unsettled orders...</p>
             </div>
           </div>
         )}
       </div>
+      <div className="mb-2">Open Orders</div>
       <div>
         {openOrders && openOrders?.length ? (
-          <div>
+          <div className="border border-bkg-4 p-6 my-6 mt-0">
             {loadingFormattedOrders
               ? [...Array(6)].map((x, i) => (
                   <Loading className="flex flex-1 rounded-none" key={i}>
@@ -1221,7 +1253,7 @@ export default function Orders() {
                                     alt={`${baseSymbol} token logo`}
                                   />
                                 ) : (
-                                  <QuestionMarkCircleIcon className="size-4 text-th-fgd-4" />
+                                  <QuestionMarkCircleIcon className="w-4 text-th-fgd-4" />
                                 )}
                                 <div>
                                   <p
@@ -1245,7 +1277,7 @@ export default function Orders() {
                                     alt={`${quoteSymbol} token logo`}
                                   />
                                 ) : (
-                                  <QuestionMarkCircleIcon className="size-4 text-th-fgd-4" />
+                                  <QuestionMarkCircleIcon className="w-4 text-th-fgd-4" />
                                 )}
                                 <div>
                                   <p
@@ -1281,9 +1313,9 @@ export default function Orders() {
                         onClick={() => cancelOrder(orderId)}
                       >
                         {cancelId === Number(orderId) ? (
-                          <Loading className="size-4" />
+                          <Loading className="w-4" />
                         ) : (
-                          <TrashIcon className="size-4" />
+                          <TrashIcon className="w-4" />
                         )}
                       </Button>
                     </div>
@@ -1291,7 +1323,7 @@ export default function Orders() {
                 })}
           </div>
         ) : (
-          <div className="flex items-center justify-center rounded-xl border border-th-bkg-4 p-6">
+          <div className="flex items-center justify-center rounded-xl border border-bkg-4 p-6">
             <div className="flex flex-col items-center">
               <p className="mb-1">No open limit orders...</p>
             </div>
