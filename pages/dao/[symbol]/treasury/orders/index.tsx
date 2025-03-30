@@ -1224,14 +1224,14 @@ export default function Orders() {
                       const isBid = sideMode === 'Buy'
 
                       setShowCustomTitleModal(true)
-                      setCurrentTitleCallback(
-                        (title: string, description: string) =>
-                          proposeSwap(title, description),
-                      )
                       setInitialTitle(
                         `${sideMode} ${
                           !isBid ? sellTokenName : buyToken?.name
                         } for ${isBid ? sellTokenName : buyToken?.name}`,
+                      )
+                      setCurrentTitleCallback(
+                        () => (title: string, description: string) =>
+                          proposeSwap(title, description),
                       )
                     }}
                   >
@@ -1320,11 +1320,11 @@ export default function Orders() {
                           className="bg-th-up !text-th-button-text md:hover:bg-th-up-dark"
                           onClick={() => {
                             setShowCustomTitleModal(true)
+                            setInitialTitle('Settle limit order')
                             setCurrentTitleCallback(
-                              (title: string, description: string) =>
+                              () => (title: string, description: string) =>
                                 settle(title, description, marketAddress),
                             )
-                            setInitialTitle('Settle limit order')
                           }}
                         >
                           <CheckIcon className="w-4" />
@@ -1480,11 +1480,11 @@ export default function Orders() {
                         disabled={cancelId === orderId}
                         onClick={() => {
                           setShowCustomTitleModal(true)
+                          setInitialTitle('Cancel limit order')
                           setCurrentTitleCallback(
-                            (title: string, description: string) =>
+                            () => (title: string, description: string) =>
                               cancelOrder(title, description, orderId),
                           )
-                          setInitialTitle('Cancel limit order')
                         }}
                       >
                         {cancelId === Number(orderId) ? (
