@@ -993,7 +993,7 @@ export default function Orders() {
           holdUpTime: 0,
           prerequisiteInstructions: prerequisiteInstructions,
           prerequisiteInstructionsSigners: signers,
-          chunkBy: 5,
+          chunkBy: 1,
         })
       } else {
         proposalInstructions.push({
@@ -1002,7 +1002,7 @@ export default function Orders() {
           ),
           holdUpTime: 0,
           prerequisiteInstructions: [],
-          chunkBy: 5,
+          chunkBy: 1,
         })
       }
     }
