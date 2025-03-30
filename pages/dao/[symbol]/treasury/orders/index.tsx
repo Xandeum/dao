@@ -821,8 +821,8 @@ export default function Orders() {
         )
         market = {
           address: marketIxs.signers[0].publicKey,
-          baseMint: () => baseMint,
-          quoteMint: () => quoteMint,
+          baseMint: () => baseTokenMint,
+          quoteMint: () => quoteTokenMint,
           baseDecimals: () =>
             !isBid
               ? sellToken.extensions.mint?.account.decimals
@@ -1216,11 +1216,15 @@ export default function Orders() {
                   <Button
                     className={`mt-4 flex h-12 w-full items-center justify-center rounded-full bg-button font-bold text-button-text focus:outline-none disabled:cursor-not-allowed disabled:opacity-40 md:hover:bg-button-hover`}
                     onClick={() => {
-                      const sellTokenName = tokenPriceService._tokenList.find(
-                        (x) =>
-                          x.address ===
-                          sellToken?.extensions.mint?.publicKey.toBase58(),
-                      )?.name
+                      const sellTokenName =
+                        tokenPriceService._tokenList.find(
+                          (x) =>
+                            x.address ===
+                            sellToken?.extensions.mint?.publicKey.toBase58(),
+                        )?.name ||
+                        abbreviateAddress(
+                          sellToken!.extensions.mint!.publicKey!,
+                        )
                       const isBid = sideMode === 'Buy'
 
                       setShowCustomTitleModal(true)
