@@ -166,6 +166,15 @@ export default function Orders() {
     }
   }, [governedTokenAccounts, selectedSolWallet])
 
+  useEffect(() => {
+    setSellToken(null)
+    setSellAmount('0')
+    setPrice('0')
+    setBuyToken(usdcToken)
+    setBuyAmount('0')
+    setSideMode('Sell')
+  }, [selectedSolWallet])
+
   const formattedTableData = async () => {
     if (!openOrders?.length) return []
     const data: any = []

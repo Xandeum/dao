@@ -7,6 +7,13 @@ import Link from 'next/link'
 import { useRouter } from 'next/router'
 import GovernancePowerForRole from './GovernancePowerForRole'
 import { useRealmVoterWeightPlugins } from '@hooks/useRealmVoterWeightPlugins'
+import { useRealmQuery } from '@hooks/queries/realm'
+import { abbreviateAddress } from '@utils/formatting'
+import Button, { SecondaryButton } from '@components/Button'
+import tokenPriceService from '@utils/services/tokenPrice'
+import TokenIcon from '@components/treasuryV2/icons/TokenIcon'
+import ImgWithLoader from '@components/ImgWithLoader'
+import { USDC_MINT } from '@blockworks-foundation/mango-v4'
 
 const GovernancePowerTitle = () => {
   const { symbol } = useRouter().query
@@ -28,6 +35,45 @@ const GovernancePowerTitle = () => {
       </Link>
     </div>
   )
+}
+
+const GovernanceTokenSwap = () => {
+  const realm = useRealmQuery().data?.result
+  const realmAccount = realm?.account
+  const communityMint = realmAccount?.communityMint.toBase58()
+  const tokenInfo = tokenPriceService._tokenList.find(
+    (x) => x.address === communityMint,
+  )
+
+  return communityMint ? (
+    <div className="flex items-center justify-end py-2">
+      <SecondaryButton
+        onClick={() => {
+          window.open(
+            `https://cabana.exchange/swap/${USDC_MINT.toBase58()}-${communityMint.toString()}?daoRef=realms`,
+            '_blank',
+          )
+        }}
+      >
+        <div className="flex items-center space-x-1">
+          <span>Buy</span>
+          <span>
+            {tokenInfo?.symbol
+              ? tokenInfo.symbol
+              : abbreviateAddress(communityMint)}{' '}
+          </span>
+          {tokenInfo?.logoURI ? (
+            <ImgWithLoader
+              className="ml-2 h-4 w-4"
+              src={tokenInfo?.logoURI}
+            ></ImgWithLoader>
+          ) : (
+            <TokenIcon className="ml-2 h-4 w-4 stroke-white" />
+          )}{' '}
+        </div>
+      </SecondaryButton>
+    </div>
+  ) : null
 }
 /* 
 // TODO: refactor deposit components to their own generic DepositForRole component
@@ -83,6 +129,7 @@ const GovernancePowerCard = () => {
           )}
         </div>
       )}
+      <GovernanceTokenSwap></GovernanceTokenSwap>
     </div>
   )
 }
