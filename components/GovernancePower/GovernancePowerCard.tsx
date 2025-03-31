@@ -36,45 +36,6 @@ const GovernancePowerTitle = () => {
     </div>
   )
 }
-
-const GovernanceTokenSwap = () => {
-  const realm = useRealmQuery().data?.result
-  const realmAccount = realm?.account
-  const communityMint = realmAccount?.communityMint.toBase58()
-  const tokenInfo = tokenPriceService._tokenList.find(
-    (x) => x.address === communityMint,
-  )
-
-  return communityMint ? (
-    <div className="flex items-center justify-end py-2">
-      <SecondaryButton
-        onClick={() => {
-          window.open(
-            `https://cabana.exchange/swap/${USDC_MINT.toBase58()}-${communityMint.toString()}?daoRef=realms`,
-            '_blank',
-          )
-        }}
-      >
-        <div className="flex items-center space-x-1">
-          <span>Buy</span>
-          <span>
-            {tokenInfo?.symbol
-              ? tokenInfo.symbol
-              : abbreviateAddress(communityMint)}{' '}
-          </span>
-          {tokenInfo?.logoURI ? (
-            <ImgWithLoader
-              className="ml-2 h-4 w-4"
-              src={tokenInfo?.logoURI}
-            ></ImgWithLoader>
-          ) : (
-            <TokenIcon className="ml-2 h-4 w-4 stroke-white" />
-          )}{' '}
-        </div>
-      </SecondaryButton>
-    </div>
-  ) : null
-}
 /* 
 // TODO: refactor deposit components to their own generic DepositForRole component
 const VanillaDeposit = ({ role }: { role: 'community' | 'council' }) => {
@@ -129,7 +90,6 @@ const GovernancePowerCard = () => {
           )}
         </div>
       )}
-      <GovernanceTokenSwap></GovernanceTokenSwap>
     </div>
   )
 }
