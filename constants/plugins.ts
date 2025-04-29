@@ -5,12 +5,12 @@ import { DRIFT_STAKE_VOTER_PLUGIN } from 'DriftStakeVoterPlugin/constants'
 import { TOKEN_HAVER_PLUGIN } from 'TokenHaverPlugin/constants'
 
 export const VSR_PLUGIN_PKS: string[] = [
+  'HBZ5oXbFBFbr8Krt2oMU7ApHFeukdRS8Rye1f3T66vg5',
   'vsr2nfGVNHmSY8uxoBGqq8AQbwz3JwaEaHqGbsTPXqQ',
   'VotEn9AWwTFtJPJSMV5F9jsMY6QwWM5qn3XP9PATGW7',
   'VoteWPk9yyGmkX4U77nEWRJWpcc8kUfrPoghxENpstL',
   'VoteMBhDCqGLRgYpp9o7DGyq81KNmwjXQRAHStjtJsS',
   '5sWzuuYkeWLBdAv3ULrBfqA51zF7Y4rnVzereboNDCPn',
-  'HBZ5oXbFBFbr8Krt2oMU7ApHFeukdRS8Rye1f3T66vg5',
   '4Q6WW2ouZ6V3iaNm56MTd5n2tnTm4C5fiH8miFHnAFHo',
 ]
 
