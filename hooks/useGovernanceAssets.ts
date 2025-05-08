@@ -204,6 +204,10 @@ export default function useGovernanceAssets() {
       name: 'Switchboard',
       image: '/img/switchboard.png',
     },
+    [PackageEnum.Raydium]: {
+      name: 'Raydium',
+      image: '/img/raydium.png',
+    },
     [PackageEnum.VsrPlugin]: {
       name: 'Vsr Plugin',
       isVisible:
@@ -820,6 +824,22 @@ export default function useGovernanceAssets() {
       packageId: PackageEnum.Switchboard,
     },
 
+    /*
+      ____                 _ _                 
+      |  _ \ __ _ _   _  __| (_)_   _ _ __ ___  
+      | |_) / _` | | | |/ _` | | | | | '_ ` _ \ 
+      |  _ < (_| | |_| | (_| | | |_| | | | | | |
+      |_| \_\__,_|\__, |\__,_|_|\__,_|_| |_| |_|
+                  |___/                         
+    */
+    [Instructions.CollectPoolFees]: {
+      name: 'Collect Pool Fees (CPMM)',
+      packageId: PackageEnum.Raydium,
+    },
+    [Instructions.CollectVestedTokens]: {
+      name: 'Collect Vested Tokens',
+      packageId: PackageEnum.Raydium,
+    },
     /*
       ██    ██ ███████ ██████      ██████  ██      ██    ██  ██████  ██ ███    ██
       ██    ██ ██      ██   ██     ██   ██ ██      ██    ██ ██       ██ ████   ██
