@@ -17,10 +17,13 @@ function useTokenPrice(symbol: string, mint: PublicKey) {
   const mintAddress = mint.toString();
 
   return useCachedValue<TokenPrice>(mintAddress, () =>
-    fetch(`https://price.jup.ag/v3/price?ids=${mintAddress}`)
+    fetch(`https://lite-api.jup.ag/price/v3?ids=${mintAddress}`)
       .then((resp) => resp.json())
       .then((result) => {
-        const price = result.data[mintAddress].price || 0;
+        const price =
+          result[mintAddress]?.usdPrice ||
+          result.data?.[mintAddress]?.price ||
+          0;
         return {
           direction: 'up',
           percentChange: 0,

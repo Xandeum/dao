@@ -10,12 +10,41 @@ import { USDC_MINT } from '@blockworks-foundation/mango-v4'
 import { useLocalStorage } from '@hooks/useLocalStorage'
 import { getJupiterPricesByMintStrings } from '@hooks/queries/jupiterPrice'
 
-const tokenListUrl = 'https://tokens.jup.ag/tokens?tags=verified,lst'
+const tokenListUrls = [
+  'https://lite-api.jup.ag/tokens/v2/tag?query=verified',
+  'https://lite-api.jup.ag/tokens/v2/tag?query=lst',
+]
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24 // 24 hours
 const PRICE_STORAGE_KEY = 'tokenPrices'
 const PRICE_CACHE_TTL_MS = 1000 * 60 * 5 // 5 minutes TTL
 
 export type TokenInfoJupiter = TokenInfo
+
+type JupiterToken = {
+  id: string
+  name: string
+  symbol: string
+  decimals: number
+  icon?: string
+  tags?: string[]
+  extensions?: TokenInfo['extensions']
+}
+
+const normalizeToken = (token: TokenInfo | JupiterToken): TokenInfo => ({
+  chainId: 'chainId' in token ? token.chainId : 101,
+  address: 'address' in token ? token.address : token.id,
+  name: token.name,
+  decimals: token.decimals,
+  symbol: token.symbol,
+  logoURI: 'logoURI' in token ? token.logoURI : token.icon,
+  tags: token.tags,
+  extensions: token.extensions,
+})
+
+const mergeTokenLists = (lists: TokenInfo[][]) =>
+  Array.from(
+    new Map(lists.flat().map((token) => [token.address, token])).values(),
+  )
 
 class TokenPriceService {
   _tokenList: TokenInfo[]
@@ -32,8 +61,14 @@ class TokenPriceService {
 
   async fetchSolanaTokenList() {
     try {
-      const tokens = await axios.get(tokenListUrl)
-      const tokenList = tokens.data as TokenInfo[]
+      const responses = await Promise.all(
+        tokenListUrls.map((url) => axios.get(url)),
+      )
+      const tokenList = mergeTokenLists(
+        responses.map((response) =>
+          (response.data as (TokenInfo | JupiterToken)[]).map(normalizeToken),
+        ),
+      )
       if (tokenList && tokenList.length) {
         this._tokenList = tokenList.map((token) => {
           const override = overrides[token.address]
@@ -63,8 +98,14 @@ class TokenPriceService {
 
     try {
       if (!tokenListRaw || !ttl || Date.now() > Number(ttl)) {
-        const response = await axios.get(tokenListUrl)
-        const tokens = response.data as TokenInfo[]
+        const responses = await Promise.all(
+          tokenListUrls.map((url) => axios.get(url)),
+        )
+        const tokens = mergeTokenLists(
+          responses.map((response) =>
+            (response.data as (TokenInfo | JupiterToken)[]).map(normalizeToken),
+          ),
+        )
 
         if (tokens && tokens.length) {
           tokenList = tokens.map((token) => {
@@ -329,28 +370,6 @@ class TokenPriceService {
 
     // logo not found so we return no data.
     return undefined
-    // Get the token data from JUP's api
-    // try {
-    //   const requestURL = `https://tokens.jup.ag/token/${mintAddress}`
-    //   const response = await axios.get(requestURL)
-    //   if (response.data) {
-    //     // Remove decimals and add chainId to match the TokenInfoWithoutDecimals struct
-    //     const { decimals, ...tokenInfoWithoutDecimals } = response.data
-
-    //     const finalTokenInfo = {
-    //       ...tokenInfoWithoutDecimals,
-    //       chainId: 101,
-    //     }
-    //     // Add to unverified token cache
-    //     this._unverifiedTokenCache[mintAddress] = finalTokenInfo
-    //     return finalTokenInfo
-    //   } else {
-    //     return undefined
-    //   }
-    // } catch {
-    //   console.error(`Metadata retrieving failed for ${mintAddress}`)
-    //   return undefined
-    // }
   }
   catch(e) {
     console.error(e)
