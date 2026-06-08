@@ -1,4 +1,3 @@
-import axios from 'axios'
 import { mergeDeepRight } from 'ramda'
 
 import { notify } from '@utils/notifications'
@@ -9,11 +8,12 @@ import { chunks } from '@utils/helpers'
 import { USDC_MINT } from '@blockworks-foundation/mango-v4'
 import { useLocalStorage } from '@hooks/useLocalStorage'
 import { getJupiterPricesByMintStrings } from '@hooks/queries/jupiterPrice'
+import {
+  fetchJupiterTokensByTagJson,
+  JupiterTokenTag,
+} from '@utils/jupiterApi'
 
-const tokenListUrls = [
-  'https://lite-api.jup.ag/tokens/v2/tag?query=verified',
-  'https://lite-api.jup.ag/tokens/v2/tag?query=lst',
-]
+const tokenListTags: JupiterTokenTag[] = ['verified', 'lst']
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24 // 24 hours
 const PRICE_STORAGE_KEY = 'tokenPrices'
 const PRICE_CACHE_TTL_MS = 1000 * 60 * 5 // 5 minutes TTL
@@ -30,13 +30,16 @@ type JupiterToken = {
   extensions?: TokenInfo['extensions']
 }
 
+const isTokenInfo = (token: TokenInfo | JupiterToken): token is TokenInfo =>
+  'address' in token
+
 const normalizeToken = (token: TokenInfo | JupiterToken): TokenInfo => ({
   chainId: 'chainId' in token ? token.chainId : 101,
-  address: 'address' in token ? token.address : token.id,
+  address: isTokenInfo(token) ? token.address : token.id,
   name: token.name,
   decimals: token.decimals,
   symbol: token.symbol,
-  logoURI: 'logoURI' in token ? token.logoURI : token.icon,
+  logoURI: isTokenInfo(token) ? token.logoURI : token.icon || undefined,
   tags: token.tags,
   extensions: token.extensions,
 })
@@ -62,12 +65,12 @@ class TokenPriceService {
   async fetchSolanaTokenList() {
     try {
       const responses = await Promise.all(
-        tokenListUrls.map((url) => axios.get(url)),
+        tokenListTags.map((tag) =>
+          fetchJupiterTokensByTagJson<(TokenInfo | JupiterToken)[]>(tag),
+        ),
       )
       const tokenList = mergeTokenLists(
-        responses.map((response) =>
-          (response.data as (TokenInfo | JupiterToken)[]).map(normalizeToken),
-        ),
+        responses.map((response) => response.map(normalizeToken)),
       )
       if (tokenList && tokenList.length) {
         this._tokenList = tokenList.map((token) => {
@@ -99,12 +102,12 @@ class TokenPriceService {
     try {
       if (!tokenListRaw || !ttl || Date.now() > Number(ttl)) {
         const responses = await Promise.all(
-          tokenListUrls.map((url) => axios.get(url)),
+          tokenListTags.map((tag) =>
+            fetchJupiterTokensByTagJson<(TokenInfo | JupiterToken)[]>(tag),
+          ),
         )
         const tokens = mergeTokenLists(
-          responses.map((response) =>
-            (response.data as (TokenInfo | JupiterToken)[]).map(normalizeToken),
-          ),
+          responses.map((response) => response.map(normalizeToken)),
         )
 
         if (tokens && tokens.length) {
