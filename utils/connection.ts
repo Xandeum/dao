@@ -1,7 +1,12 @@
 import type { EndpointTypes } from '@models/types'
 import { Connection } from '@solana/web3.js'
 import type { EndpointInfo } from '../@types/types'
-import { DEVNET_RPC, MAINNET_RPC } from '@constants/endpoints'
+import {
+  DEVNET_RPC,
+  DEVNET_WS_RPC,
+  MAINNET_RPC,
+  MAINNET_WS_RPC,
+} from '@constants/endpoints'
 
 export const BACKUP_CONNECTIONS = [
   new Connection(`https://rpc.mngo.cloud/rlmk0lo5odee/`, 'recent'),
@@ -32,9 +37,14 @@ export interface ConnectionContext {
 
 export function getConnectionContext(cluster: string): ConnectionContext {
   const ENDPOINT = ENDPOINTS.find((e) => e.name === cluster) || ENDPOINTS[0]
+  const wsEndpoint =
+    ENDPOINT!.name === 'devnet' ? DEVNET_WS_RPC : MAINNET_WS_RPC
   return {
     cluster: ENDPOINT!.name as EndpointTypes,
-    current: new Connection(ENDPOINT!.url, 'recent'),
+    current: new Connection(ENDPOINT!.url, {
+      commitment: 'recent',
+      wsEndpoint,
+    }),
     endpoint: ENDPOINT!.url,
   }
 }

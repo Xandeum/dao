@@ -1,9 +1,7 @@
-export const MAINNET_RPC =
-  process.env.NEXT_PUBLIC_MAINNET_RPC ||
-  process.env.MAINNET_RPC ||
-  'https://api.mainnet-beta.solana.com'
+import { getSolanaRpcEndpoint, getSolanaWsEndpoint } from '@utils/solanaRpc'
 
-export const DEVNET_RPC =
-  process.env.NEXT_PUBLIC_DEVNET_RPC ||
-  process.env.DEVNET_RPC ||
-  'https://api.devnet.solana.com'
+export const MAINNET_RPC = getSolanaRpcEndpoint('mainnet')
+export const DEVNET_RPC = getSolanaRpcEndpoint('devnet')
+
+export const MAINNET_WS_RPC = getSolanaWsEndpoint('mainnet')
+export const DEVNET_WS_RPC = getSolanaWsEndpoint('devnet')

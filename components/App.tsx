@@ -29,7 +29,12 @@ import {
   WalletProvider,
 } from '@solana/wallet-adapter-react'
 import useLegacyConnectionContext from '@hooks/useLegacyConnectionContext'
-import { DEVNET_RPC, MAINNET_RPC } from 'constants/endpoints'
+import {
+  DEVNET_RPC,
+  DEVNET_WS_RPC,
+  MAINNET_RPC,
+  MAINNET_WS_RPC,
+} from 'constants/endpoints'
 import {
   SquadsEmbeddedWalletAdapter,
   detectEmbeddedInSquadsIframe,
@@ -79,6 +84,10 @@ export function App(props: Props) {
     () => (cluster === 'devnet' ? DEVNET_RPC : MAINNET_RPC),
     [cluster],
   )
+  const wsEndpoint = useMemo(
+    () => (cluster === 'devnet' ? DEVNET_WS_RPC : MAINNET_WS_RPC),
+    [cluster],
+  )
 
   const supportedWallets = useMemo(
     () =>
@@ -89,7 +98,7 @@ export function App(props: Props) {
   )
 
   return (
-    <ConnectionProvider endpoint={endpoint}>
+    <ConnectionProvider endpoint={endpoint} config={{ wsEndpoint }}>
       <WalletProvider wallets={supportedWallets}>
         <AppContents {...props} />{' '}
       </WalletProvider>

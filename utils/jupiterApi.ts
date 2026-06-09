@@ -1,8 +1,10 @@
 const JUPITER_API_BASE_URL = 'https://api.jup.ag'
 
 export const JUPITER_API_KEY_ENV_VAR = 'JUPITER_API_KEY'
+export const JUPITER_SWAP_API_BASE_URL_ENV_VAR = 'JUPITER_SWAP_API_BASE_URL'
 export const JUPITER_PRICE_BATCH_LIMIT = 50
 export const JUPITER_PRICE_PROXY_PATH = '/api/jupiter/price'
+export const JUPITER_QUOTE_PROXY_PATH = '/api/jupiter/quote'
 export const JUPITER_TOKENS_TAG_PROXY_PATH = '/api/jupiter/tokens/tag'
 export const JUPITER_TOKEN_TAGS = ['verified', 'lst'] as const
 
@@ -17,6 +19,19 @@ const buildProxyUrl = (pathname: string, params: Record<string, string>) => {
 
 const buildJupiterUrl = (pathname: string, params: Record<string, string>) => {
   const url = new URL(pathname, JUPITER_API_BASE_URL)
+  Object.entries(params).forEach(([key, value]) => {
+    url.searchParams.set(key, value)
+  })
+  return url.toString()
+}
+
+export const buildJupiterSwapUrl = (
+  pathname: string,
+  params: Record<string, string>,
+) => {
+  const baseUrl =
+    process.env[JUPITER_SWAP_API_BASE_URL_ENV_VAR] || JUPITER_API_BASE_URL
+  const url = new URL(pathname, baseUrl)
   Object.entries(params).forEach(([key, value]) => {
     url.searchParams.set(key, value)
   })
@@ -76,4 +91,13 @@ export const fetchJupiterTokensByTagJson = async <T>(query: JupiterTokenTag) =>
     params: {
       query,
     },
+  })
+
+export const fetchJupiterQuoteJson = async <T>(
+  params: Record<string, string>,
+) =>
+  fetchJupiterJson<T>({
+    pathname: '/swap/v1/quote',
+    proxyPath: JUPITER_QUOTE_PROXY_PATH,
+    params,
   })
