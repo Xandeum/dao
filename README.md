@@ -1,7 +1,7 @@
 ### Using custom Swap API endpoints
 
-You can set custom URLs via the configuration for any self-hosted Jupiter APIs, like the [V6 Swap API](https://station.jup.ag/docs/apis/self-hosted) or [Paid Hosted APIs](https://station.jup.ag/docs/apis/self-hosted#paid-hosted-apis) Here is an example:
+Jupiter swap requests are proxied through the app server so API keys stay private. If you need a custom self-hosted or paid Jupiter base URL, configure it with a server-side env var:
 
 ```
-NEXT_PUBLIC_JUPTER_SWAP_API_ENDPOINT=https://quote-api.jup.ag/v6
+JUPITER_SWAP_API_BASE_URL=https://api.jup.ag
 ```

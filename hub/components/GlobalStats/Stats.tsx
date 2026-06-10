@@ -15,6 +15,7 @@ import { NumRealms } from './NumRealms';
 import { NumVoteRecords } from './NumVoteRecords';
 import { TotalValue } from './TotalValue';
 import { ValueByDao } from './ValueByDao';
+import { HELIUS_MAINNET_PROXY_PATH } from '@utils/heliusApi';
 
 interface Props {
   className?: string;
@@ -43,10 +44,19 @@ export function Stats(props: Props) {
   const [donefetchingNFTs, setDoneFetchingNFTs] = useState(false);
   const timer = useRef<number | null>(null);
   const wakePrevent = useRef<any>(null);
-  const connection = useRef(
-    new Connection(process.env.NEXT_PUBLIC_HELIUS_MAINNET_RPC || '', 'recent'),
-  );
+  const connection = useRef<Connection | null>(null);
   const logger = useRef(new Logger());
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    connection.current = new Connection(
+      new URL(HELIUS_MAINNET_PROXY_PATH, window.location.origin).toString(),
+      'recent',
+    );
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && running) {
@@ -115,37 +125,39 @@ export function Stats(props: Props) {
         <NumProposals proposals={proposals} />
         <NumVoteRecords voteRecords={voteRecords} />
         <NumMembers members={members} />
-        <DataFetch
-          className="mt-10"
-          connection={connection.current}
-          logger={logger.current}
-          onComplete={() => {
-            if (wakePrevent?.current?.release) {
-              wakePrevent.current.release();
-            }
+        {connection.current ? (
+          <DataFetch
+            className="mt-10"
+            connection={connection.current}
+            logger={logger.current}
+            onComplete={() => {
+              if (wakePrevent?.current?.release) {
+                wakePrevent.current.release();
+              }
 
-            if (timer?.current) {
-              window.clearInterval(timer.current);
-            }
+              if (timer?.current) {
+                window.clearInterval(timer.current);
+              }
 
-            setRunning(false);
-          }}
-          onMembersComplete={setMembers}
-          onNFTRealms={setNFTRealms}
-          onNFTRealmsComplete={(realms) => {
-            setNFTRealms(realms);
-            setDoneFetchingNFTs(true);
-          }}
-          onProposalsComplete={setProposals}
-          onRealmsComplete={setRealms}
-          onTVLComplete={(total, byDao, byDaosAndTokens) => {
-            setTotalValue(total);
-            setValueByDao(byDao);
-            setValueByDaoAndTokens(byDaosAndTokens);
-          }}
-          onVoteRecordsComplete={setVoteRecords}
-          runCount={runCount}
-        />
+              setRunning(false);
+            }}
+            onMembersComplete={setMembers}
+            onNFTRealms={setNFTRealms}
+            onNFTRealmsComplete={(realms) => {
+              setNFTRealms(realms);
+              setDoneFetchingNFTs(true);
+            }}
+            onProposalsComplete={setProposals}
+            onRealmsComplete={setRealms}
+            onTVLComplete={(total, byDao, byDaosAndTokens) => {
+              setTotalValue(total);
+              setValueByDao(byDao);
+              setValueByDaoAndTokens(byDaosAndTokens);
+            }}
+            onVoteRecordsComplete={setVoteRecords}
+            runCount={runCount}
+          />
+        ) : null}
         <Logs className="mt-10" logger={logger.current} />
       </div>
     </article>

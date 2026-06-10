@@ -1,41 +1,19 @@
 import { PublicKey } from '@solana/web3.js'
 import { useQuery } from '@tanstack/react-query'
+import { JUPITER_PRICE_BATCH_LIMIT, fetchJupiterPriceJson } from '@utils/jupiterApi'
 import queryClient from './queryClient'
-
-const URL = 'https://api.jup.ag/price/v2'
 
 /* example query
 # Unit price of 1 JUP & 1 SOL based on the Derived Price in USDC
-https://api.jup.ag/price/v2?ids=JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN,So11111111111111111111111111111111111111112
+https://api.jup.ag/price/v3?ids=JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN,So11111111111111111111111111111111111111112
 
 {
-    "data": {
-        "So11111111111111111111111111111111111111112": {
-            "id": "So11111111111111111111111111111111111111112",
-            "type": "derivedPrice",
-            "price": "133.890945000"
-        },
-        "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN": {
-            "id": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
-            "type": "derivedPrice",
-            "price": "0.751467"
-        }
+    "So11111111111111111111111111111111111111112": {
+        "usdPrice": 133.890945000
     },
-    "timeTaken": 0.00395219
-}
-*/
-/* example intentionally broken query 
-curl -X 'GET' 'https://api.jup.ag/price/v2?ids=So11111111111111111111111111111111111111112&showExtraInfo=true'
-{
-    "data": {
-        "So11111111111111111111111111111111111111112": {
-            "id": "So11111111111111111111111111111111111111112",
-            "type": "derivedPrice",
-            "price": "134.170633378"
-        },
-        "8agCopCHWdpj7mHk3JUWrzt8pHAxMiPX5hLVDJh9TXWv": null
-    },
-    "timeTaken": 0.003186833
+    "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN": {
+        "usdPrice": 0.751467
+    }
 }
 */
 
@@ -53,6 +31,39 @@ type Response = {
   timeTaken: number
 }
 
+type V3Price = {
+  usdPrice?: number
+  price?: number
+}
+
+type V3Response = Record<string, V3Price | null | undefined>
+
+const isLegacyResponse = (
+  response: Response | V3Response,
+): response is Response => 'data' in response && 'timeTaken' in response
+
+const normalizePriceResponse = (
+  response: Response | V3Response,
+): Response['data'] => {
+  if (isLegacyResponse(response)) {
+    return response.data
+  }
+
+  return Object.fromEntries(
+    Object.entries(response)
+      .filter(
+        ([, data]) => data?.usdPrice !== undefined || data?.price !== undefined,
+      )
+      .map(([id, data]) => [
+        id,
+        {
+          id,
+          price: Number(data?.usdPrice ?? data?.price),
+        },
+      ]),
+  ) as Response['data']
+}
+
 function* chunks<T>(arr: T[], n: number): Generator<T[], void> {
   for (let i = 0; i < arr.length; i += n) {
     yield arr.slice(i, i + n)
@@ -68,10 +79,17 @@ export const jupiterPriceQueryKeys = {
   ],
 }
 
+const fetchJupiterPriceBatch = async (
+  mints: string[],
+): Promise<Response['data']> => {
+  const response = await fetchJupiterPriceJson<Response | V3Response>(mints)
+  return normalizePriceResponse(response)
+}
+
 const jupQueryFn = async (mint: PublicKey) => {
-  const x = await fetch(`${URL}?ids=${mint?.toString()}`)
-  const response = (await x.json()) as Response
-  const result = response.data[mint.toString()]
+  const result = (await fetchJupiterPriceBatch([mint.toString()]))[
+    mint.toString()
+  ]
   return result !== undefined
     ? ({ found: true, result } as const)
     : ({ found: false, result: undefined } as const)
@@ -111,16 +129,16 @@ export const useJupiterPricesByMintsQuery = (mints: PublicKey[]) => {
     enabled,
     queryKey: jupiterPriceQueryKeys.byMints(dedupedMints),
     queryFn: async () => {
-      const batches = [...chunks(dedupedMints, 100)]
+      const batches = [
+        ...chunks(dedupedMints, JUPITER_PRICE_BATCH_LIMIT),
+      ]
       const responses = await Promise.all(
-        batches.map(async (batch) => {
-          const x = await fetch(`${URL}?ids=${batch.join(',')}`)
-          const response = (await x.json()) as Response
-          return response
-        }),
+        batches.map((batch) =>
+          fetchJupiterPriceBatch(batch.map((mint) => mint.toString())),
+        ),
       )
       const data = responses.reduce(
-        (acc, next) => ({ ...acc, ...next.data }),
+        (acc, next) => ({ ...acc, ...next }),
         {} as Response['data'],
       )
 
@@ -150,14 +168,21 @@ export const useJupiterPricesByMintsQuery = (mints: PublicKey[]) => {
 }
 
 // function is used to get fresh token prices
-export const getJupiterPricesByMintStrings = async (mints: string[]) => {
+export const getJupiterPricesByMintStrings = async (
+  mints: string[],
+): Promise<Response['data']> => {
   if (mints.length === 0) return {}
   const deduped = new Set(mints)
   const dedupedMints = Array.from(deduped)
   try {
-    const x = await fetch(`${URL}?ids=${dedupedMints.join(',')}`)
-    const response = (await x.json()) as Response
-    const data = response.data
+    const batches = [...chunks(dedupedMints, 50)]
+    const responses = await Promise.all(
+      batches.map((batch) => fetchJupiterPriceBatch(batch)),
+    )
+    const data = responses.reduce(
+      (acc, next) => ({ ...acc, ...next }),
+      {} as Response['data'],
+    )
 
     //override chai price if its broken
     const chaiMint = '3jsFX1tx2Z8ewmamiwSU851GzyzM2DJMq7KWW5DM8Py3'

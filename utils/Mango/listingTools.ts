@@ -29,6 +29,7 @@ import {
 } from '@solana/web3.js'
 import SwitchboardProgram from '@switchboard-xyz/sbv2-lite'
 import { notify } from '@utils/notifications'
+import { fetchJupiterQuoteJson } from '@utils/jupiterApi'
 import Big from 'big.js'
 import { secondsToHours } from 'date-fns'
 
@@ -264,23 +265,16 @@ const fetchJupiterRoutes = async (
 ) => {
   {
     try {
-      const paramsString = new URLSearchParams({
+      const params = {
         inputMint: inputMint.toString(),
         outputMint: outputMint.toString(),
         amount: amount.toString(),
         slippageBps: Math.ceil(slippage * 100).toString(),
         feeBps: feeBps.toString(),
         swapMode,
-      }).toString()
+      }
 
-      const jupiterSwapBaseUrl =
-        process.env.NEXT_PUBLIC_JUPTER_SWAP_API_ENDPOINT ||
-        'https://quote-api.jup.ag/v6'
-      const response = await fetch(
-        `${jupiterSwapBaseUrl}/quote?${paramsString}`,
-      )
-
-      const res = await response.json()
+      const res = await fetchJupiterQuoteJson<RouteInfo | null>(params)
       return {
         bestRoute: (res ? res : null) as RouteInfo | null,
       }

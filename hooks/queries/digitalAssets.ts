@@ -6,25 +6,13 @@ import { useConnection } from '@solana/wallet-adapter-react'
 import { getNativeTreasuryAddress } from '@solana/spl-governance'
 import queryClient from './queryClient'
 import { getNetworkFromEndpoint } from '@utils/connection'
+import { getHeliusProxyPath, HeliusNetwork } from '@utils/heliusApi'
 import axios from 'axios'
 import { BN } from '@coral-xyz/anchor'
 
 type Network = 'devnet' | 'mainnet'
-const getHeliusEndpoint = (network: Network) => {
-  const url =
-    network === 'devnet'
-      ? process.env.NEXT_PUBLIC_HELIUS_DEVNET_RPC
-      : process.env.NEXT_PUBLIC_HELIUS_MAINNET_RPC
-  if (url === undefined)
-    throw new Error(
-      `Helius RPC endpoint not set in env: ${
-        network === 'devnet'
-          ? 'NEXT_PUBLIC_HELIUS_DEVNET_RPC'
-          : 'NEXT_PUBLIC_HELIUS_MAINNET_RPC'
-      }`,
-    )
-  return url
-}
+const getHeliusEndpoint = (network: Network) =>
+  getHeliusProxyPath(network as HeliusNetwork)
 
 export const digitalAssetsQueryKeys = {
   all: (network: Network) => [network, 'DigitalAssets'], // TBH endpoint is stupid for this. it should be either 'devnet' or 'mainnet'.

@@ -2,11 +2,15 @@ import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { clusterApiUrl, Connection } from '@solana/web3.js';
 import { useRouter } from 'next/router';
 import { createContext, useEffect, useState } from 'react';
+import {
+  DEVNET_RPC,
+  DEVNET_WS_RPC,
+  MAINNET_RPC,
+  MAINNET_WS_RPC,
+} from '@constants/endpoints';
 
-const DEVNET_RPC_ENDPOINT =
-  process.env.DEVNET_RPC || 'https://api.dao.devnet.solana.com/';
-const MAINNET_RPC_ENDPOINT =
-  process.env.MAINNET_RPC || 'http://realms-realms-c335.mainnet.rpcpool.com';
+const DEVNET_RPC_ENDPOINT = DEVNET_RPC;
+const MAINNET_RPC_ENDPOINT = MAINNET_RPC;
 const TESTNET_RPC_ENDPOINT = 'http://127.0.0.1:8899';
 
 export enum ClusterType {
@@ -25,7 +29,10 @@ interface Cluster {
 
 export const DevnetCluster: Cluster = {
   type: ClusterType.Devnet,
-  connection: new Connection(DEVNET_RPC_ENDPOINT, 'recent'),
+  connection: new Connection(DEVNET_RPC_ENDPOINT, {
+    commitment: 'recent',
+    wsEndpoint: DEVNET_WS_RPC,
+  }),
   endpoint: clusterApiUrl('devnet'),
   network: WalletAdapterNetwork.Devnet,
   rpcEndpoint: DEVNET_RPC_ENDPOINT,
@@ -33,7 +40,10 @@ export const DevnetCluster: Cluster = {
 
 export const MainnetCluster: Cluster = {
   type: ClusterType.Mainnet,
-  connection: new Connection(MAINNET_RPC_ENDPOINT, 'recent'),
+  connection: new Connection(MAINNET_RPC_ENDPOINT, {
+    commitment: 'recent',
+    wsEndpoint: MAINNET_WS_RPC,
+  }),
   endpoint: clusterApiUrl('mainnet-beta'),
   network: WalletAdapterNetwork.Mainnet,
   rpcEndpoint: MAINNET_RPC_ENDPOINT,

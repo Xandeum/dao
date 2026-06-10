@@ -3,6 +3,7 @@ import CautionIcon from '@carbon/icons-react/lib/Caution';
 import type { PublicKey } from '@solana/web3.js';
 import { pipe } from 'fp-ts/lib/function';
 
+import { getJupiterPricesByMintStrings } from '@hooks/queries/jupiterPrice';
 import { useCachedValue } from '@hub/hooks/useCachedValue';
 import cx from '@hub/lib/cx';
 import * as RE from '@hub/types/Result';
@@ -13,20 +14,19 @@ interface TokenPrice {
   price: number;
 }
 
-function useTokenPrice(symbol: string, mint: PublicKey) {
+function useTokenPrice(mint: PublicKey) {
   const mintAddress = mint.toString();
 
-  return useCachedValue<TokenPrice>(mintAddress, () =>
-    fetch(`https://price.jup.ag/v3/price?ids=${mintAddress}`)
-      .then((resp) => resp.json())
-      .then((result) => {
-        const price = result.data[mintAddress].price || 0;
-        return {
-          direction: 'up',
-          percentChange: 0,
-          price,
-        };
-      }),
+  return useCachedValue<TokenPrice>(mintAddress, async () => {
+    const result = await getJupiterPricesByMintStrings([mintAddress]);
+    const price = result[mintAddress]?.price || 0;
+
+    return {
+      direction: 'up',
+      percentChange: 0,
+      price,
+    };
+  },
   );
 }
 
@@ -37,7 +37,7 @@ interface Props {
 }
 
 export function HeaderTokenPrice(props: Props) {
-  const tokenPrice = useTokenPrice(props.symbol, props.mint);
+  const tokenPrice = useTokenPrice(props.mint);
 
   return pipe(
     tokenPrice,
